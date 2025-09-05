@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\app.py", line 18, in <module>
+    spec.loader.exec_module(mod)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "<frozen importlib._bootstrap_external>", line 1026, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\aurum_gui.py", line 43, in <module>
+    from PySide6.QtWidgets import (
+    ...<5 lines>...
+    )
+ImportError: could not import module 'PySide6.QtGui'

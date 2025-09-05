@@ -1,0 +1,91 @@
+# === 建好必要的套件結構（有就覆蓋/沒就建立） ===
+New-Item -ItemType File app\__init__.py -Force | Out-Null
+New-Item -ItemType File app\utils\__init__.py -Force | Out-Null
+New-Item -ItemType File app\routers\__init__.py -Force | Out-Null
+
+# === 寫入 app\utils\config.py ===
+@'
+APP_NAME = "AurumLedger Web"
+APP_VERSION = "0.1.0"
+CORS_ORIGINS = ["*"]  # 先全開，之後再鎖
+'@ | Set-Content -Encoding UTF8 app\utils\config.py
+
+# === 寫入 app\utils\db.py（含容錯的 init_db） ===
+@'
+# -*- coding: utf-8 -*-
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+DB_PATH = os.getenv("RESTO_DB", "resto.db")
+engine = create_engine(f"sqlite:///{DB_PATH}", future=True, echo=False)
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, future=True)
+Base = declarative_base()
+
+def init_db():
+    # 若沒有 models 也不會當掉；有的話就會載入並建立資料表
+    try:
+        from app import models  # noqa: F401
+    except Exception:
+        pass
+    Base.metadata.create_all(bind=engine)
+'@ | Set-Content -Encoding UTF8 app\utils\db.py
+
+# === 寫入 app\routers\auth.py ===
+@'
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+@router.get("/ping")
+def ping():
+    return {"pong": True}
+'@ | Set-Content -Encoding UTF8 app\routers\auth.py
+
+# === 寫入 app\routers\items.py ===
+@'
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/items", tags=["items"])
+
+@router.get("/")
+def list_items():
+    return []
+'@ | Set-Content -Encoding UTF8 app\routers\items.py
+
+# === 寫入 app\main.py（FastAPI 進入點） ===
+@'
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.utils.config import APP_NAME, APP_VERSION, CORS_ORIGINS
+from app.utils.db import init_db
+from app.routers import auth, items
+
+app = FastAPI(title=APP_NAME, version=APP_VERSION)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS if CORS_ORIGINS != ["*"] else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 初始化資料表
+init_db()
+
+# 掛上路由
+app.include_router(auth.router)
+app.include_router(items.router)
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
+'@ | Set-Content -Encoding UTF8 app\main.py
+
+# === 清除 .pyc 快取（避免舊的快取干擾） ===
+Remove-Item -Recurse -Force app\__pycache__, app\utils\__pycache__, app\routers\__pycache__ -ErrorAction SilentlyContinue
+
+# === 驗證模組能否被匯入（應該都要 True） ===
+python -c "import importlib.util as u; print('app.main?', bool(u.find_spec('app.main'))); print('app.utils.db?', bool(u.find_spec('app.utils.db')))"
