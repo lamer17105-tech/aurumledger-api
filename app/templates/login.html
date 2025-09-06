@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-card">
+  <h1>登入</h1>
+  <form id="loginForm">
+    <label>帳號 <input name="username" required></label>
+    <label>密碼 <input name="password" type="password" required></label>
+    <button type="submit">登入</button>
+  </form>
+  <p class="muted">首次使用？請先在資料庫建立使用者並設定 password_hash。</p>
+</section>
+{% endblock %}

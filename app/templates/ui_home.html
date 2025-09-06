@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}UI Home{% endblock %}
+{% block content %}
+  <h2>可用的資料表</h2>
+  {% if not have_db %}
+    <p class="muted">尚未偵測到資料庫連線，僅能顯示空頁。</p>
+  {% endif %}
+  <ul>
+    {% for t in tables %}
+      <li><a href="/ui/table/{{ t }}">{{ t }}</a></li>
+    {% endfor %}
+  </ul>
+  {% if tables|length == 0 %}
+    <p class="muted">沒有偵測到任何資料表。請建立（例如 <code>orders</code>）後重新整理。</p>
+  {% endif %}
+{% endblock %}

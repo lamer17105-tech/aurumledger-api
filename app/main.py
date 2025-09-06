@@ -1,33 +1,37 @@
 # app/main.py
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request, Depends
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+from .auth import router as auth_router
+from .import_export import router as data_router
+from .deps import login_required
+from .settings import SECRET_KEY  # 放一個穩定隨機字串；Render 以環境變數注入
 
-from .utils.config import APP_NAME, APP_VERSION, CORS_ORIGINS
-from .utils.db import init_db
-from .routers import auth, items
-from .routers import biz  # ← 新增
+app = FastAPI(title="AurumLedger Web")
 
-app = FastAPI(title=APP_NAME, version=APP_VERSION)
+app.add_middleware(SessionMiddleware,
+                   secret_key=SECRET_KEY,
+                   same_site="lax",
+                   https_only=False)  # 上雲後設 True
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=CORS_ORIGINS if CORS_ORIGINS != ["*"] else ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
 
-init_db()
+# ===== 頁面（一律走 base.html，受保護）=====
+@app.get("/login")
+def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request, "title": "登入"})
 
-# API
-app.include_router(auth.router)
-app.include_router(items.router)
-app.include_router(biz.router)  # ← 新增
+@app.get("/")
+@app.get("/orders")
+def orders_page(request: Request, _=Depends(login_required)):
+    return templates.TemplateResponse("orders.html", {"request": request, "title": "訂單"})
 
-@app.get("/healthz")
-def healthz():
-    return {"ok": True}
+@app.get("/expenses")
+def expenses_page(request: Request, _=Depends(login_required)):
+    return templates.TemplateResponse("expenses.html", {"request": request, "title": "支出"})
 
-# 前端（靜態檔）
-app.mount("/ui", StaticFiles(directory="web", html=True), name="ui")
+# ===== API 路由 =====
+app.include_router(auth_router)
+app.include_router(data_router)
