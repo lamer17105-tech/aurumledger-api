@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}AurumLedger{% endblock %}｜AurumLedger 企業版</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v=20250907l">
+</head>
+<body>
+  <div class="app {% if auth_only %}auth-only{% endif %}">
+    {% if not auth_only %}
+    <aside class="sidebar">
+      <a href="/orders" class="brand brand-link" title="回到訂單">
+        <div class="brand-title nowrap">📊 AurumLedger 企業版</div>
+        <div class="brand-sub nowrap">餐飲作帳系統</div>
+      </a>
+      <nav class="nav">
+        {% set path = request.url.path %}
+        <a class="nav-item {% if path.startswith('/orders') %}active{% endif %}"  href="/orders">📄 訂單</a>
+        <a class="nav-item {% if path.startswith('/expenses') %}active{% endif %}" href="/expenses">💸 支出</a>
+        <a class="nav-item {% if path.startswith('/kpi') %}active{% endif %}"      href="/kpi">📈 營業額</a>
+        <a class="nav-item {% if path.startswith('/reports') %}active{% endif %}"  href="/reports">📊 報表</a>
+        <a class="nav-item {% if path.startswith('/ai') %}active{% endif %}"       href="/ai">🤖 AI 智能助手</a>
+      </nav>
+    </aside>
+    {% endif %}
+
+    <main class="main">
+      {% if not auth_only %}
+      <!-- 簡化的 topbar（不再放 actions）-->
+      <header class="topbar compact soft"><div class="spacer"></div></header>
+      {% endif %}
+
+      <section class="content {% if auth_only %}auth-center{% else %}tight{% endif %}">
+        {% block content %}{% endblock %}
+      </section>
+
+      {% if not auth_only and user %}
+      <!-- 右下角浮動：帳號設定／登出 -->
+      <div class="floating-actions">
+        <a class="btn pill primary" href="/account">帳號設定</a>
+        <a class="btn pill danger"  href="/logout">登出</a>
+      </div>
+      {% endif %}
+    </main>
+  </div>
+</body>
+</html>

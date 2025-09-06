@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>匯出 / 匯入 設定</h1>
+
+<section class="card">
+  <h2>匯出 CSV</h2>
+  <div class="btn-row">
+    <a class="btn" href="/export/orders.csv">匯出訂單</a>
+    <a class="btn" href="/export/expenses.csv">匯出支出</a>
+  </div>
+</section>
+
+<section class="card">
+  <h2>匯入 CSV</h2>
+  <div class="grid-2">
+    <form method="post" action="/import/orders.csv" enctype="multipart/form-data">
+      <label>訂單 CSV</label>
+      <input type="file" name="file" accept=".csv" required>
+      <button type="submit">匯入</button>
+    </form>
+    <form method="post" action="/import/expenses.csv" enctype="multipart/form-data">
+      <label>支出 CSV</label>
+      <input type="file" name="file" accept=".csv" required>
+      <button type="submit">匯入</button>
+    </form>
+  </div>
+  <p class="hint">欄位格式：<code>訂單：id,order_no,amount,date,memo</code>；<code>支出：id,category,amount,date,memo</code>。</p>
+</section>
+{% endblock %}

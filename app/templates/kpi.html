@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}營業額{% endblock %}
+{% block content %}
+
+{% set prev_label = '前一天' if mode=='day' else ('前一月' if mode=='month' else '前一年') %}
+{% set today_label = '今日'  if mode=='day' else ('今月'  if mode=='month' else '今年') %}
+{% set next_label = '後一天' if mode=='day' else ('後一月' if mode=='month' else '後一年') %}
+
+<div class="card toolbar toolbar--range kpi-head">
+  <form id="range-form" method="get" action="/kpi" class="row">
+    <label class="label">模式</label>
+    <select name="mode" id="mode">
+      <option value="day"   {% if mode=='day' %}selected{% endif %}>當日</option>
+      <option value="month" {% if mode=='month' %}selected{% endif %}>當月</option>
+      <option value="year"  {% if mode=='year' %}selected{% endif %}>當年</option>
+    </select>
+    <input type="date" name="dt" id="dt" value="{{ dt }}">
+    <a class="btn pill primary" href="/kpi?mode={{ mode }}&dt={{ nav.prev }}">← {{ prev_label }}</a>
+    <a class="btn pill primary" href="/kpi?mode={{ mode }}&dt={{ nav.today }}">{{ today_label }}</a>
+    <a class="btn pill primary" href="/kpi?mode={{ mode }}&dt={{ nav.next }}">{{ next_label }} →</a>
+    <span class="kpi-note">期間：{{ period }}</span>
+  </form>
+</div>
+
+<div class="kpi-grid-4">
+  <div class="kpi-mini kpi-early">🧾 早班{{ '當日' if mode=='day' else ('當月' if mode=='month' else '當年') }}</div>
+  <div class="kpi-mini kpi-late">🌙 晚班{{ '當日' if mode=='day' else ('當月' if mode=='month' else '當年') }}</div>
+  <div class="kpi-mini kpi-exp">💳 當日支出</div>
+  <div class="kpi-mini kpi-total">📊 當日總額</div>
+
+  <div class="kpi-figure kpi-num-early">NT${{ k_early | money }}</div>
+  <div class="kpi-figure kpi-num-late">NT${{ k_late  | money }}</div>
+  <div class="kpi-figure kpi-num-exp">NT${{ k_exp   | money }}</div>
+  <div class="kpi-figure kpi-num-total">NT${{ k_total | money }}</div>
+
+  <div class="kpi-mini kpi-net">✅ 扣支出後</div>
+  <div class="kpi-figure kpi-num-net">NT${{ k_net | money }}</div>
+</div>
+
+<script>
+  const f=document.getElementById('range-form');
+  document.getElementById('mode').addEventListener('change',()=>f.submit());
+  document.getElementById('dt').addEventListener('change',()=>f.submit());
+</script>
+{% endblock %}

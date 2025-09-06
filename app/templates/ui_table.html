@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ table }} | UI{% endblock %}
+{% block content %}
+  <div class="row" style="justify-content:space-between;">
+    <h2 style="margin:0;">{{ table }} <span class="pill">PK: {{ pk or '（未知）' }}</span></h2>
+    <details>
+      <summary>新增資料</summary>
+      <form method="post" action="/ui/{{ table }}/create">
+        {% for c in columns %}
+          <div style="margin:8px 0;">
+            <label>{{ c }}</label><br>
+            <input name="{{ c }}" placeholder="{{ c }}">
+          </div>
+        {% endfor %}
+        <button class="btn">新增</button>
+      </form>
+    </details>
+  </div>
+
+  <table style="margin-top:18px;">
+    <thead>
+      <tr>
+        {% for c in columns %}
+          <th>{{ c }}</th>
+        {% endfor %}
+        {% if pk %}<th>操作</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+        <tr>
+          {% for c in columns %}
+            <td>{{ r[c] }}</td>
+          {% endfor %}
+          {% if pk %}
+            <td>
+              <details>
+                <summary>編輯</summary>
+                <form class="inline" method="post" action="/ui/{{ table }}/{{ r[pk] }}/update">
+                  {% for c in columns %}
+                    {% if c != pk %}
+                      <input name="{{ c }}" value="{{ r[c] }}" placeholder="{{ c }}" />
+                    {% endif %}
+                  {% endfor %}
+                  <button class="btn">儲存</button>
+                </form>
+              </details>
+              <form class="inline" method="post" action="/ui/{{ table }}/{{ r[pk] }}/delete" onsubmit="return confirm('確定刪除？')">
+                <button class="btn" style="background:#b91c1c">刪除</button>
+              </form>
+            </td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if rows|length == 0 %}
+    <p class="muted">目前沒有資料。</p>
+  {% endif %}
+{% endblock %}

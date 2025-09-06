@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}報表{% endblock %}
+{% block content %}
+
+{% set prev_label   = '前一天' if mode=='day' else ('前一月' if mode=='month' else '前一年') %}
+{% set today_label  = '今日'   if mode=='day' else ('今月'   if mode=='month' else '今年') %}
+{% set next_label   = '後一天' if mode=='day' else ('後一月' if mode=='month' else '後一年') %}
+{% set date_label   = '日期'   if mode=='day' else ('月份'   if mode=='month' else '年份') %}
+
+<div class="card toolbar toolbar--range">
+  <form id="rep-form" method="get" action="/reports" class="row">
+    <label class="label">模式</label>
+    <select name="mode" id="rep-mode">
+      <option value="day"   {% if mode=='day' %}selected{% endif %}>當日</option>
+      <option value="month" {% if mode=='month' %}selected{% endif %}>當月</option>
+      <option value="year"  {% if mode=='year' %}selected{% endif %}>當年</option>
+    </select>
+    <label class="label">{{ date_label }}</label>
+    <input type="date" name="dt" id="rep-dt" value="{{ dt }}">
+
+    <a class="btn pill primary" href="/reports?mode={{ mode }}&dt={{ nav.prev }}">← {{ prev_label }}</a>
+    <a class="btn pill primary" href="/reports?mode={{ mode }}&dt={{ nav.today }}">{{ today_label }}</a>
+    <a class="btn pill primary" href="/reports?mode={{ mode }}&dt={{ nav.next }}">{{ next_label }} →</a>
+  </form>
+</div>
+
+<div class="export-strip minimalist">
+  <button type="button" class="tile blue"  onclick="exportCsv('orders')">🧾 另存訂單 CSV</button>
+  <button type="button" class="tile gold"  onclick="exportCsv('expenses')">📄 另存支出 CSV</button>
+  <button type="button" class="tile green" onclick="exportCsv('sales')">✅ 另存營業額 CSV</button>
+</div>
+
+<script>
+  // 模式/日期自動提交
+  const rf=document.getElementById('rep-form');
+  document.getElementById('rep-mode').addEventListener('change',()=>rf.submit());
+  document.getElementById('rep-dt').addEventListener('change',()=>rf.submit());
+
+  // 以原生另存（支援 Chrome/Edge；https 或 localhost）
+  async function saveWithPicker(filename, blob){
+    if ('showSaveFilePicker' in window){
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'CSV 檔案', accept: { 'text/csv': ['.csv'] } }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+    }else{
+      // 後備：下載（同樣寫入含 BOM 的 Blob）
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      alert('瀏覽器不支援原生另存，已改為下載。建議使用 Chrome 或 Edge。');
+    }
+  }
+
+  // 取得 CSV、強制補 UTF-8 BOM 位元組再存檔
+  async function exportCsv(kind){
+    const scope = document.getElementById('rep-mode').value;
+    const dt    = document.getElementById('rep-dt').value;
+    const url   = `/export/${kind}.csv?scope=${encodeURIComponent(scope)}&base=${encodeURIComponent(dt)}`;
+    try{
+      const res = await fetch(url, {cache:'no-store'});
+      if(!res.ok) throw new Error('匯出失敗');
+
+      // 以位元組取得，確保我們能自己處理 BOM
+      let buf  = await res.arrayBuffer();
+      let data = new Uint8Array(buf);
+
+      // 若後端已含 BOM，就先去掉，避免重複
+      if (data.length >= 3 && data[0] === 0xEF && data[1] === 0xBB && data[2] === 0xBF){
+        data = data.slice(3);
+      }
+      // 強制在前面補上 BOM
+      const bom  = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const out  = new Uint8Array(bom.length + data.length);
+      out.set(bom, 0);
+      out.set(data, bom.length);
+
+      const blob = new Blob([out], {type:'text/csv;charset=utf-8'});
+      const filename = `${kind}_${scope}_${dt}.csv`;
+      await saveWithPicker(filename, blob);
+    }catch(err){
+      console.error(err);
+      alert('匯出過程發生問題，請稍後再試。');
+    }
+  }
+</script>
+{% endblock %}

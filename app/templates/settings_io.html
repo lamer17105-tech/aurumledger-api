@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page">
+  <div class="page-head"><div class="title">匯出 / 匯入 設定</div></div>
+  <div class="card light" style="padding:16px;">
+    <div class="actions" style="gap:8px;flex-wrap:wrap">
+      <button id="btnExportOrders" class="btn outline">匯出訂單 CSV</button>
+      <button id="btnExportExpenses" class="btn outline">匯出支出 CSV</button>
+      <form id="importForm" class="import-form" enctype="multipart/form-data">
+        <label class="btn outline">選擇 CSV<input type="file" name="file" accept=".csv" hidden></label>
+        <select name="table" class="select"><option value="orders">orders</option><option value="expenses">expenses</option></select>
+        <button type="submit" class="btn primary">上傳匯入</button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

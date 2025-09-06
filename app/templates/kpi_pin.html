@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}KPI 安全驗證{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px;margin:40px auto">
+  <h3 style="margin-top:0">輸入 KPI 二次密碼</h3>
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+  <form method="post" action="/kpi/guard" class="toolbar" style="gap:10px">
+    <input class="input" type="password" name="pin" placeholder="二次密碼" required>
+    <button class="btn primary pill" type="submit">確認</button>
+  </form>
+</div>
+{% endblock %}

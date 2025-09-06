@@ -1,24 +1,24 @@
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from app import get_db
-from .models import User
-from .utils.security import decode_token
+# app/deps.py
+from typing import Generator
+from fastapi import Depends, Request, HTTPException, status
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
 
-auth_scheme = HTTPBearer()
+# 你的 DB URL（沿用現有設定）
+# 例：DATABASE_URL = "sqlite:///./data.db" 或 "postgresql+psycopg://..."
+from .settings import DATABASE_URL, SECRET_KEY  # 若沒有 settings.py，就把常數寫在這支
 
-def get_current_user(
-    cred: HTTPAuthorizationCredentials = Depends(auth_scheme),
-    db: Session = Depends(get_db),
-):
+engine = create_engine(DATABASE_URL, future=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
+
+def get_db() -> Generator[Session, None, None]:
+    db = SessionLocal()
     try:
-        payload = decode_token(cred.credentials)
-        username = payload.get("sub")
-        if not username:
-            raise ValueError("no sub")
-        user = db.query(User).filter(User.username == username).first()
-        if not user:
-            raise ValueError("no user")
-        return user
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        yield db
+    finally:
+        db.close()
+
+def login_required(request: Request):
+    if not request.session.get("uid"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未登入")
+    return True

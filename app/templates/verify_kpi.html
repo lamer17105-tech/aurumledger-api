@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="center-wrap">
+  <div class="card card-narrow">
+    <h2 class="card-title">KPI 驗證</h2>
+    {% if request.query_params.get('err') %}<div class="alert error">密碼錯誤。</div>{% endif %}
+    <form method="post" class="grid g-2">
+      <input class="input" type="password" name="passcode" placeholder="輸入二次密碼" required />
+      <button class="btn btn-primary w-100">驗證</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

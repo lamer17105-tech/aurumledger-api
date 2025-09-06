@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}帳號設定{% endblock %}
+{% block content %}
+<div class="card">
+  <h3 style="margin-top:0">帳號設定</h3>
+  {% if ok %}<div class="alert ok">{{ ok }}</div>{% endif %}
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+  <form method="post" action="/account/update" class="toolbar" style="flex-direction:column;align-items:stretch;gap:12px">
+    <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center">
+      <label>目前帳號</label><input class="input" type="text" value="{{ username }}" disabled>
+      <label>新帳號</label><input class="input" type="text" name="new_username" placeholder="留空不變更">
+      <label>新密碼</label><input class="input" type="password" name="new_password" placeholder="留空不變更">
+      <label>KPI 二次密碼</label><input class="input" type="password" name="new_kpi_pin" placeholder="選填：查看 KPI 需要輸入">
+      <label>目前密碼（必填）</label><input class="input" type="password" name="current_password" required>
+    </div>
+    <div><button class="btn primary pill" type="submit">儲存</button></div>
+  </form>
+</div>
+{% endblock %}

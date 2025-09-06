@@ -1,11 +1,49 @@
 Traceback (most recent call last):
-  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\app.py", line 18, in <module>
-    spec.loader.exec_module(mod)
-    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^
-  File "<frozen importlib._bootstrap_external>", line 1026, in exec_module
-  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
-  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\aurum_gui.py", line 43, in <module>
-    from PySide6.QtWidgets import (
-    ...<5 lines>...
-    )
-ImportError: could not import module 'PySide6.QtGui'
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\sql\sqltypes.py", line 1709, in _object_value_for_elem
+    return self._object_lookup[elem]  # type: ignore[return-value]
+           ~~~~~~~~~~~~~~~~~~~^^^^^^
+KeyError: '早班'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\aurum_gui.py", line 1316, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\aurum_gui.py", line 1311, in main
+    w=MainWindow(current_code=current_code, settings=settings)
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\aurum_gui.py", line 1164, in __init__
+    self.orders   = OrdersTab(settings=self.settings)
+                    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\aurum_gui.py", line 350, in __init__
+    self._refresh_history(); self.load()
+                             ~~~~~~~~~^^
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\aurum_gui.py", line 417, in load
+    rs=s.query(Order).filter(Order.date==d).order_by(asc(Order.id)).all()
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\orm\query.py", line 2704, in all
+    return self._iter().all()  # type: ignore
+           ~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\engine\result.py", line 1774, in all
+    return self._allrows()
+           ~~~~~~~~~~~~~^^
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\engine\result.py", line 548, in _allrows
+    rows = self._fetchall_impl()
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\engine\result.py", line 1681, in _fetchall_impl
+    return self._real_result._fetchall_impl()
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\engine\result.py", line 2275, in _fetchall_impl
+    return list(self.iterator)
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\orm\loading.py", line 220, in chunks
+    fetch = cursor._raw_all_rows()
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\engine\result.py", line 541, in _raw_all_rows
+    return [make_row(row) for row in rows]
+            ~~~~~~~~^^^^^
+  File "lib/sqlalchemy/cyextension/resultproxy.pyx", line 22, in sqlalchemy.cyextension.resultproxy.BaseRow.__init__
+  File "lib/sqlalchemy/cyextension/resultproxy.pyx", line 79, in sqlalchemy.cyextension.resultproxy._apply_processors
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\sql\sqltypes.py", line 1829, in process
+    value = self._object_value_for_elem(value)
+  File "C:\Users\Nguyen Le Quy Vi\PycharmProjects\PythonProject10\.venv\Lib\site-packages\sqlalchemy\sql\sqltypes.py", line 1711, in _object_value_for_elem
+    raise LookupError(
+    ...<7 lines>...
+    ) from err
+LookupError: '早班' is not among the defined enum values. Enum name: shift. Possible values: MORNING, EVENING

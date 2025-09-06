@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h2>📈 營業額</h2>
+
+<section class="panel" style="margin-top:10px">
+  <form class="row" method="get" action="/ui/dashboard">
+    <label class="pill">模式</label>
+    <select name="mode" onchange="this.form.submit()">
+      <option value="day"   {% if mode=='day' %}selected{% endif %}>當日</option>
+      <option value="month" {% if mode=='month' %}selected{% endif %}>當月</option>
+      <option value="year"  {% if mode=='year' %}selected{% endif %}>當年</option>
+    </select>
+    <label class="pill">日期</label>
+    <input type="date" name="d" value="{{ d }}">
+    <button class="btn">套用</button>
+    <div class="spacer"></div>
+    <span class="muted">期間：{{ period_label }}</span>
+  </form>
+</section>
+
+<section class="kpi">
+  <div class="kpi-card">
+    <div class="kpi-title">🌅 早班</div>
+    <div class="kpi-value">NT$ {{ '{:,.0f}'.format(morning|float) }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">🌙 晚班</div>
+    <div class="kpi-value">NT$ {{ '{:,.0f}'.format(evening|float) }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">💸 支出</div>
+    <div class="kpi-value">NT$ {{ '{:,.0f}'.format(expense|float) }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-title">📊 總額</div>
+    <div class="kpi-value">NT$ {{ '{:,.0f}'.format(total|float) }}</div>
+    <div class="kpi-sub">扣支出後 NT$ {{ '{:,.0f}'.format(net|float) }}</div>
+  </div>
+</section>
+{% endblock %}

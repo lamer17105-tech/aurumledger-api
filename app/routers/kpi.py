@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, and_
 from ..utils.db import SessionLocal
-from ..models import Order, Expense, Shift
+from app.utils.models import Order, Expense, Shift
 from ..security import require_revenue_token
 
 router = APIRouter(prefix="/kpi", tags=["kpi"])

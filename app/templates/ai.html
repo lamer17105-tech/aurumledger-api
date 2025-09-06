@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}AI 智能助手{% endblock %}
+{% block content %}
+<div class="card">
+  <form method="post" action="/ai/analyze" class="toolbar">
+    <label>輸入問題（例：本月利潤 / 今天支出 / 今年總營業額 / 本月TOP3支出分類 / 單號 37）</label>
+    <select name="mode" class="input">
+      <option value="auto">自動</option>
+      <option value="day">當日</option>
+      <option value="month">當月</option>
+      <option value="year">當年</option>
+    </select>
+    <label>起</label><input type="date" name="start" class="input">
+    <label>迄</label><input type="date" name="end" class="input">
+    <input type="text" name="q" class="input" value="{{ q or '' }}" placeholder="在此輸入問題…">
+    <button class="btn pill primary" type="submit">▶ 解析</button>
+  </form>
+</div>
+
+{% if answer_html %}
+<div class="card" id="ai-answer">{{ answer_html | safe }}</div>
+{% endif %}
+
+<div class="toolbar" style="justify-content:center;gap:12px;margin-top:20px">
+  <form method="post" action="/ai/analyze"><input type="hidden" name="q" value="今天淨利"><button class="btn pill">今日利潤</button></form>
+  <form method="post" action="/ai/analyze"><input type="hidden" name="q" value="本月支出"><button class="btn pill">本月支出</button></form>
+  <form method="post" action="/ai/analyze"><input type="hidden" name="q" value="今年總營業額"><button class="btn pill">今年總營業額</button></form>
+  <form method="post" action="/ai/analyze"><input type="hidden" name="q" value="今天早班營業額"><button class="btn pill">今天早班營業額</button></form>
+  <form method="post" action="/ai/analyze"><input type="hidden" name="q" value="今天晚班營業額"><button class="btn pill">今天晚班營業額</button></form>
+  <form method="post" action="/ai/analyze"><input type="hidden" name="q" value="本月TOP3支出分類"><button class="btn pill">本月TOP3支出分類</button></form>
+</div>
+{% endblock %}

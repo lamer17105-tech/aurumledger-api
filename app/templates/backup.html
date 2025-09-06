@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}備份 / 還原{% endblock %}
+{% block content %}
+
+{% if ok %}<div class="alert ok">{{ ok }}</div>{% endif %}
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+<div class="card toolbar" style="align-items:center;gap:12px">
+  <h3 style="margin:0;font-weight:800">建立備份</h3>
+  <form method="get" action="/backup/download" class="row" style="gap:10px;align-items:center">
+    <label class="label">包含資料庫</label>
+    <input type="checkbox" name="inc_db" value="1" checked>
+    <label class="label">包含帳號設定</label>
+    <input type="checkbox" name="inc_auth" value="1" checked>
+    <button class="btn pill primary" type="submit">⬇ 下載備份 ZIP</button>
+  </form>
+  <div class="muted" style="margin-left:2px">打包：templates/*.html、static/css/style.css、app/web_ui.py、aurum.db、auth.json（依勾選）。</div>
+</div>
+
+<div class="card toolbar" style="align-items:center;gap:12px">
+  <h3 style="margin:0;font-weight:800">還原備份</h3>
+  <form method="post" action="/backup/restore" enctype="multipart/form-data" class="row" style="gap:10px;align-items:center">
+    <input class="input" type="file" name="file" accept=".zip" required>
+    <button class="btn pill danger" type="submit">⬆ 上傳並還原</button>
+  </form>
+  <div class="muted">完成後請重啟：<code>uvicorn app.web_ui:app --reload --host 127.0.0.1 --port 8000</code></div>
+</div>
+{% endblock %}

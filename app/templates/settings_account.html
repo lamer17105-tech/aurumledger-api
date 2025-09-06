@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page">
+  <div class="page-head"><div class="title">帳號設定</div></div>
+  <div class="card light" style="max-width:560px;padding:18px;">
+    <form id="accountForm" class="form" action="/auth/change-credentials" method="post">
+      <label class="field"><span>目前密碼</span><input name="current_password" type="password" required></label>
+      <label class="field"><span>新帳號（可留空）</span><input name="new_username" autocomplete="username"></label>
+      <label class="field"><span>新密碼（可留空）</span><input name="new_password" type="password" autocomplete="new-password" minlength="6"></label>
+      <div class="actions right"><button type="submit" class="btn primary">套用變更</button></div>
+    </form>
+    <div class="muted small" id="meBox" style="margin-top:8px;"></div>
+  </div>
+</section>
+{% endblock %}

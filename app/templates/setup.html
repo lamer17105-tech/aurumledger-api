@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="center-wrap">
+  <div class="card card-narrow">
+    <h2 class="card-title">初次設定</h2>
+    <form method="post" class="grid g-2">
+      <input class="input" type="text" name="username" placeholder="管理者帳號" required />
+      <input class="input" type="password" name="password" placeholder="管理者密碼" required />
+      <button class="btn btn-primary w-100">建立帳號並登入</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

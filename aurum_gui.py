@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-# AurumLedger 企業版｜餐飲作帳系統（超安全啟動版，已修正 ExpensesTab 初始化順序 & reload 保護）
-# 強化點：全域錯誤攔截→error.log、舊版 SQLAlchemy 相容、壞掉 auth.json 自動備份、登入可重試、
-# 營業額二次密碼、安全外觀(關大理石與陰影)、啟動健檢
+# AurumLedger 企業版｜餐飲作帳系統（修正版：Shift 以代碼 MORNING/EVENING 存DB；開機自動正規化）
+# 強化點：
+# 1) 啟動時備份並把 DB 內「早班/晚班/AM/PM…」自動轉為 MORNING/EVENING（避免 Enum 炸掉）
+# 2) 模型改為嚴格 Enum（validate_strings=True），並在寫入前自動把中文轉代碼
+# 3) 介面顯示中文；DB 一律存代碼；查詢用 Enum
 
 import os, sys, json, base64, hashlib, hmac, enum, csv
 from datetime import date, timedelta
@@ -9,7 +11,7 @@ from decimal import Decimal, InvalidOperation
 
 # ====== 啟動旗標 ======
 USE_MARBLE = False     # 先關掉大理石背景；確認可正常運作後可改 True
-SAFE_THEME  = True     # 啟動簡潔/高對比主題（避免因樣式出錯）
+SAFE_THEME  = True     # 簡潔高對比主題
 LOG_FILE    = "error.log"
 
 # --- 全域例外攔截：視窗提示 + 寫入 error.log ---
@@ -23,7 +25,6 @@ def _exception_hook(exctype, value, tb):
             f.write(msg)
     except Exception:
         pass
-    # 嘗試顯示對話框（若 GUI 尚未起來則忽略）
     try:
         from PySide6.QtWidgets import QMessageBox
         QMessageBox.critical(None, "未預期錯誤", (msg[:2000] + ("\n...（更完整內容見 error.log）" if len(msg)>2000 else "")))
@@ -52,16 +53,14 @@ from PySide6.QtCore import Qt, QDate, Signal, QTimer
 
 from sqlalchemy import (
     create_engine, Column, Integer, String, Date, Enum as SAEnum, Numeric, Text,
-    func, asc, and_, or_
+    func, asc, and_, or_, event, MetaData, text, update
 )
 from sqlalchemy.orm import sessionmaker
 
 # ====================== 啟動健檢 ======================
 def preflight_checks():
     msgs = []
-    # 檢查當前 Python/平台
     msgs.append(f"Python: {sys.version.split()[0]}  | 平台: {sys.platform}")
-    # 檢查寫檔權限（資料夾）
     try:
         with open("_write_test.tmp", "w", encoding="utf-8") as f:
             f.write("ok")
@@ -69,7 +68,6 @@ def preflight_checks():
         msgs.append("寫入權限：OK")
     except Exception as e:
         msgs.append(f"寫入權限：失敗 ({e})")
-    # 檢查套件版本
     try:
         import PySide6
         msgs.append(f"PySide6：{getattr(PySide6,'__version__','unknown')}")
@@ -82,8 +80,57 @@ def preflight_checks():
         msgs.append(f"SQLAlchemy 載入失敗：{e}")
     return "\n".join(msgs)
 
-# ====================== 資料庫 ======================
+# ====================== 資料庫（啟動修復） ======================
 DB_PATH = os.getenv("RESTO_DB", "resto.db")
+DB_PATH = os.path.abspath(DB_PATH)
+
+def _backup_sqlite(db_path: str):
+    import shutil, datetime
+    if not os.path.exists(db_path):
+        return
+    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    bak = db_path + f".bak.{ts}"
+    try:
+        shutil.copy2(db_path, bak)
+        for ext in (db_path + "-wal", db_path + "-shm"):
+            if os.path.exists(ext):
+                shutil.copy2(ext, ext + f".bak.{ts}")
+        print(f"[BOOT] DB 已備份 → {bak}")
+    except Exception as e:
+        print(f"[BOOT] 備份失敗：{e}")
+
+def _normalize_shift_values(db_path: str):
+    """把 早班/晚班/AM/PM… 轉為 MORNING/EVENING；在 ORM 建立前執行"""
+    if not os.path.exists(db_path):
+        return
+    tmp_engine = create_engine(f"sqlite:///{db_path}", future=True)
+    meta = MetaData()
+    meta.reflect(bind=tmp_engine)
+    FIX = {
+        "早班":"MORNING","上午":"MORNING","am":"MORNING","AM":"MORNING","morning":"MORNING",
+        "晚班":"EVENING","夜班":"EVENING","下午":"EVENING","pm":"EVENING","PM":"EVENING","evening":"EVENING",
+    }
+    with tmp_engine.begin() as conn:
+        for tbl in meta.tables.values():
+            cols = {c.name.lower() for c in tbl.columns}
+            if "shift" not in cols:
+                continue
+            conn.execute(text(f"UPDATE {tbl.name} SET shift=UPPER(TRIM(shift)) WHERE shift IS NOT NULL"))
+            for k, v in FIX.items():
+                conn.execute(text(f"UPDATE {tbl.name} SET shift=:v WHERE shift=:k"),
+                             {"v": v, "k": k.upper()})
+            rows = conn.execute(text(f"SELECT shift, COUNT(*) FROM {tbl.name} GROUP BY shift")).all()
+            print(f"[BOOT] {tbl.name} shift 分布：{dict(rows)}")
+    tmp_engine.dispose()
+
+# 執行一次性資料修復
+if os.path.exists(DB_PATH):
+    _backup_sqlite(DB_PATH)
+    _normalize_shift_values(DB_PATH)
+else:
+    print(f"[BOOT] 尚未找到資料庫，稍後 create_all() 會建立：{DB_PATH}")
+
+# 建立正式 engine / Session
 try:
     engine = create_engine(f"sqlite:///{DB_PATH}", future=True, echo=False)
 except Exception as e:
@@ -92,15 +139,31 @@ except Exception as e:
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, future=True)
 Base = declarative_base()
 
-class Shift(str, enum.Enum):
-    MORNING = "早班"
-    EVENING = "晚班"
+# ===== Shift 代碼/標籤對照（DB 存代碼、UI 顯示中文）=====
+class ShiftEnum(str, enum.Enum):
+    MORNING = "MORNING"
+    EVENING = "EVENING"
 
+SHIFT_CODE_LABEL = {"MORNING": "早班", "EVENING": "晚班"}
+LABEL2CODE = {
+    "早班":"MORNING","上午":"MORNING","am":"MORNING","AM":"MORNING","morning":"MORNING",
+    "晚班":"EVENING","夜班":"EVENING","下午":"EVENING","pm":"EVENING","PM":"EVENING","evening":"EVENING"
+}
+def shift_label(code:str) -> str:
+    return SHIFT_CODE_LABEL.get(str(code), str(code))
+def shift_code(label:str) -> str:
+    if label is None: return "MORNING"
+    s = str(label).strip()
+    return LABEL2CODE.get(s, s).upper()
+
+# ====== ORM 模型 ======
 class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True)
     date = Column(Date, nullable=False, index=True)
-    shift = Column(SAEnum(Shift), nullable=False, index=True)
+    # 嚴格 Enum，存字串；不存中文
+    shift = Column(SAEnum(ShiftEnum, name="shift", native_enum=False, validate_strings=True),
+                   nullable=False, index=True, default=ShiftEnum.MORNING)
     order_no = Column(String(32), nullable=False, index=True)
     amount = Column(Numeric(14,2), nullable=False)
     memo = Column(Text)
@@ -112,6 +175,19 @@ class Expense(Base):
     category = Column(String(50), nullable=False)
     amount = Column(Numeric(14,2), nullable=False)
     note = Column(Text)
+
+# 寫入/更新時自動把中文/別名轉為代碼
+@event.listens_for(Order, "before_insert")
+@event.listens_for(Order, "before_update")
+def _coerce_shift(mapper, connection, target):
+    val = getattr(target, "shift", None)
+    if isinstance(val, ShiftEnum):
+        return
+    code = shift_code(val)
+    try:
+        target.shift = ShiftEnum(code)
+    except Exception:
+        target.shift = ShiftEnum.MORNING
 
 def init_db():
     try:
@@ -128,7 +204,6 @@ def _safe_read_json(path):
         with open(path,"r",encoding="utf-8") as f:
             return json.load(f)
     except Exception:
-        # JSON 壞掉：改名備份，回傳 None
         try:
             os.rename(path, path+".broken")
         except Exception:
@@ -305,7 +380,6 @@ class OrdersTab(QWidget):
         self.btnSearch=QPushButton("🔎 搜尋"); self.btnSearch.clicked.connect(self._enter_search)
         srow.addWidget(self._flabel("搜尋")); srow.addWidget(self.search); srow.addWidget(self.btnSearch)
         sLay.addLayout(srow)
-
         self.hist=QListWidget(); self.hist.setVisible(False); self.hist.setMaximumHeight(160)
         self.hist.setSelectionMode(QAbstractItemView.SingleSelection)
         self.hist.setStyleSheet("""
@@ -321,7 +395,7 @@ class OrdersTab(QWidget):
         addBox=QFrame(); addBox.setObjectName("glassBox")
         rowLay=QHBoxLayout(addBox); rowLay.setContentsMargins(10,10,10,10); rowLay.setSpacing(8)
         rowLay.addWidget(self._flabel("日期")); self.d=QDateEdit(QDate.currentDate()); self.d.setCalendarPopup(True); self.d.dateChanged.connect(lambda:self.load()); rowLay.addWidget(self.d)
-        rowLay.addWidget(self._flabel("班別")); self.shift=QComboBox(); self.shift.addItems([Shift.MORNING.value, Shift.EVENING.value]); rowLay.addWidget(self.shift)
+        rowLay.addWidget(self._flabel("班別")); self.shift=QComboBox(); self.shift.addItems([shift_label("MORNING"), shift_label("EVENING")]); rowLay.addWidget(self.shift)
         rowLay.addWidget(self._flabel("單號")); self.no=QLineEdit(); self.no.setPlaceholderText("如 10037 或 37"); rowLay.addWidget(self.no)
         rowLay.addWidget(self._flabel("金額")); self.amt=QLineEdit(); self.amt.setPlaceholderText("如 2568"); rowLay.addWidget(self.amt)
         add=QPushButton("新增"); add.clicked.connect(self.add); rowLay.addWidget(add)
@@ -406,8 +480,8 @@ class OrdersTab(QWidget):
         it.setFlags((it.flags()|Qt.ItemIsEditable) if editable else (it.flags() & ~Qt.ItemIsEditable))
         self.t.setItem(row,col,it)
 
-    def _color_for_shift(self, st:str):
-        return QBrush(QColor("#e0f2fe")) if st==Shift.MORNING.value else QBrush(QColor("#ede9fe"))
+    def _color_for_shift(self, code:str):
+        return QBrush(QColor("#e0f2fe")) if code=="MORNING" else QBrush(QColor("#ede9fe"))
 
     def load(self, query:str|None=None):
         self._loading=True
@@ -425,8 +499,9 @@ class OrdersTab(QWidget):
                 rs=s.query(Order).filter(and_(*cond)).order_by(asc(Order.id)).all()
         self.t.setSortingEnabled(False); self.t.setRowCount(len(rs))
         for i,o in enumerate(rs):
-            br=self._color_for_shift(o.shift.value)
-            self._set_item(i,0,o.shift.value,brush=br)
+            code = o.shift.value  # 'MORNING' / 'EVENING'
+            br=self._color_for_shift(code)
+            self._set_item(i,0,shift_label(code),brush=br)
             self._set_item(i,1,o.order_no,editable=True)
             self._set_item(i,2,f"{float(o.amount):,.0f}",editable=True)
             self._set_item(i,3,o.date.strftime("%Y-%m-%d"))
@@ -463,12 +538,12 @@ class OrdersTab(QWidget):
     def add(self):
         try:
             d=self.d.date().toPython()
-            sh=Shift.MORNING if self.shift.currentText()==Shift.MORNING.value else Shift.EVENING
+            code = shift_code(self.shift.currentText())      # 'MORNING' / 'EVENING'
             no=self.no.text().strip(); amt=dec(self.amt.text())
             if not no or amt<=0:
                 QMessageBox.warning(self,"錯誤","請輸入單號與正確金額。"); return
             with SessionLocal() as s:
-                s.add(Order(date=d, shift=sh, order_no=no, amount=amt)); s.commit()
+                s.add(Order(date=d, shift=ShiftEnum(code), order_no=no, amount=amt)); s.commit()
             self.no.clear(); self.amt.clear(); self.load(None); self.updated.emit(); self.no.setFocus(); self.no.selectAll()
         except ValueError as e:
             QMessageBox.warning(self,"錯誤", str(e))
@@ -517,16 +592,13 @@ class ExpensesTab(QWidget):
         sLay.addLayout(trow)
         root.addWidget(searchBox)
 
-        # 定義模式切換函式（但**先不要**呼叫，等表格建好再呼叫）
         def on_mode_change():
             is_range = (self.time_mode.currentText()=="區間")
             self.d_ref.setVisible(not is_range)
             for w in (self.fd,self.td): w.setVisible(is_range)
-            # 這行會用到 self.t，因此要在 self.t 建立後才會被觸發
             self._reload_current(self.search.text().strip() or None)
-        self._on_mode_change = on_mode_change  # 存成成員，稍後呼叫
+        self._on_mode_change = on_mode_change
 
-        # 事件連結（也先不會觸發 reload，直到我們手動呼叫一次）
         self.time_mode.currentIndexChanged.connect(self._on_mode_change)
         self.d_ref.dateChanged.connect(lambda *_: self._reload_current(self.search.text().strip() or None))
         self.fd.dateChanged.connect(lambda *_: self._reload_current(self.search.text().strip() or None))
@@ -546,7 +618,7 @@ class ExpensesTab(QWidget):
         self.amt.returnPressed.connect(lambda:self.note.setFocus()); self.note.returnPressed.connect(self.add)
         root.addWidget(addBox)
 
-        # --- 表格（一定要先建好，再做第一次載入） ---
+        # --- 表格 ---
         self.t=QTableWidget(0,5); self.t.setHorizontalHeaderLabels(["分類","金額","日期","備註","ID(隱藏)"])
         h=self.t.horizontalHeader(); [h.setSectionResizeMode(i,QHeaderView.Stretch) for i in range(4)]
         self.t.setColumnHidden(4,True); self.t.verticalHeader().setVisible(False)
@@ -559,7 +631,6 @@ class ExpensesTab(QWidget):
         delb=QPushButton("刪除選中"); delb.setObjectName("btnDanger"); delb.clicked.connect(self.delete)
         row2.addWidget(delb); row2.addStretch(); root.addLayout(row2)
 
-        # 歷史搜尋清單
         self.hist=QListWidget(); self.hist.setVisible(False); self.hist.setMaximumHeight(160)
         self.hist.setSelectionMode(QAbstractItemView.SingleSelection)
         self.hist.setStyleSheet("""
@@ -570,14 +641,12 @@ class ExpensesTab(QWidget):
         self.hist.itemClicked.connect(lambda it: self._apply_query(it.text()))
         root.addWidget(self.hist)
 
-        # 搜尋互動
         self.search.focused_in.connect(lambda: self._show_hist(self.search.text()))
         self.search.focused_out.connect(lambda: QTimer.singleShot(120,self._maybe_hide_hist))
         self.search.textChanged.connect(self._on_search_change)
         self.search.arrow.connect(self._on_arrow)
         self.search.decide.connect(self._enter_search)
 
-        # 先更新一次歷史，再做「第一次模式套用」→ 此時 self.t 已存在，安全
         self._refresh_history()
         self._on_mode_change()
 
@@ -645,7 +714,6 @@ class ExpensesTab(QWidget):
         self.search.setText(q); self.hist.hide(); self._reload_current(q)
 
     def _reload_current(self, query:str|None=None):
-        # ---- 重要：表格尚未建立時（於初始化早期），直接返回，避免 AttributeError ----
         if not hasattr(self, "t"):
             return
         d1,d2=self._range()
@@ -721,13 +789,13 @@ class DashboardTab(QWidget):
         self.m=QDateEdit(QDate.currentDate()); self.m.setCalendarPopup(True); self.m.setDisplayFormat("yyyy-MM"); self.m.dateChanged.connect(self.refresh)
         self.btn_m_prev=QPushButton("← 上一月"); self.btn_m_this=QPushButton("本月"); self.btn_m_next=QPushButton("下一月 →")
         self.btn_m_prev.clicked.connect(lambda:self._set_month(self.m.date().addMonths(-1)))
-        self.btn_m_this.clicked.connect(lambda:self._set_month(QDate.currentDate()))
+        self.btn_m_this.clicked.connect(lambda:self._set_month(self.m.date().addMonths(1)))
         self.btn_m_next.clicked.connect(lambda:self._set_month(self.m.date().addMonths(1)))
 
         self.y=QDateEdit(QDate.currentDate()); self.y.setCalendarPopup(True); self.y.setDisplayFormat("yyyy"); self.y.dateChanged.connect(self.refresh)
         self.btn_y_prev=QPushButton("← 前一年"); self.btn_y_this=QPushButton("今年"); self.btn_y_next=QPushButton("後一年 →")
         self.btn_y_prev.clicked.connect(lambda:self._set_year(self.y.date().addYears(-1)))
-        self.btn_y_this.clicked.connect(lambda:self._set_year(QDate.currentDate()))
+        self.btn_y_this.clicked.connect(lambda:self._set_year(self.y.date().addYears(1)))
         self.btn_y_next.clicked.connect(lambda:self._set_year(self.y.date().addYears(1)))
 
         self.period=QLabel(""); self.period.setAlignment(Qt.AlignCenter)
@@ -764,8 +832,8 @@ class DashboardTab(QWidget):
         if m=="當日":
             d=self.d.date().toPython()
             with SessionLocal() as s:
-                mm=s.query(func.coalesce(func.sum(Order.amount),0)).filter(Order.date==d,Order.shift==Shift.MORNING).scalar() or 0
-                me=s.query(func.coalesce(func.sum(Order.amount),0)).filter(Order.date==d,Order.shift==Shift.EVENING).scalar() or 0
+                mm=s.query(func.coalesce(func.sum(Order.amount),0)).filter(Order.date==d,Order.shift==ShiftEnum.MORNING).scalar() or 0
+                me=s.query(func.coalesce(func.sum(Order.amount),0)).filter(Order.date==d,Order.shift==ShiftEnum.EVENING).scalar() or 0
                 mx=s.query(func.coalesce(func.sum(Expense.amount),0)).filter(Expense.date==d).scalar() or 0
             total=float(mm)+float(me); net=total-float(mx)
             self.kpi.update(f"NT${float(mm):,.0f}", f"NT${float(me):,.0f}", f"NT${float(mx):,.0f}",
@@ -774,8 +842,8 @@ class DashboardTab(QWidget):
         elif m=="當月":
             q=self.m.date().toPython(); y,mn=q.year,q.month; first,last=month_first_last(y,mn)
             with SessionLocal() as s:
-                mm=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=first,Order.date<=last,Order.shift==Shift.MORNING)).scalar() or 0
-                me=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=first,Order.date<=last,Order.shift==Shift.EVENING)).scalar() or 0
+                mm=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=first,Order.date<=last,Order.shift==ShiftEnum.MORNING)).scalar() or 0
+                me=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=first,Order.date<=last,Order.shift==ShiftEnum.EVENING)).scalar() or 0
                 mx=s.query(func.coalesce(func.sum(Expense.amount),0)).filter(and_(Expense.date>=first,Expense.date<=last)).scalar() or 0
             total=float(mm)+float(me); net=total-float(mx)
             self.kpi.update(f"NT${float(mm):,.0f}", f"NT${float(me):,.0f}", f"NT${float(mx):,.0f}",
@@ -784,8 +852,8 @@ class DashboardTab(QWidget):
         else:
             yv=self.y.date().year(); first,last=year_first_last(yv)
             with SessionLocal() as s:
-                mm=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=first,Order.date<=last,Order.shift==Shift.MORNING)).scalar() or 0
-                me=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=first,Order.date<=last,Order.shift==Shift.EVENING)).scalar() or 0
+                mm=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=first,Order.date<=last,Order.shift==ShiftEnum.MORNING)).scalar() or 0
+                me=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=first,Order.date<=last,Order.shift==ShiftEnum.EVENING)).scalar() or 0
                 mx=s.query(func.coalesce(func.sum(Expense.amount),0)).filter(and_(Expense.date>=first,Expense.date<=last)).scalar() or 0
             total=float(mm)+float(me); net=total-float(mx)
             self.kpi.update(f"NT${float(mm):,.0f}", f"NT${float(me):,.0f}", f"NT${float(mx):,.0f}",
@@ -810,13 +878,13 @@ class ReportsTab(QWidget):
         self.m=QDateEdit(QDate.currentDate()); self.m.setCalendarPopup(True); self.m.setDisplayFormat("yyyy-MM")
         self.btn_m_prev=QPushButton("← 上一月"); self.btn_m_this=QPushButton("本月"); self.btn_m_next=QPushButton("下一月 →")
         self.btn_m_prev.clicked.connect(lambda:self._set_month(self.m.date().addMonths(-1)))
-        self.btn_m_this.clicked.connect(lambda:self._set_month(QDate.currentDate()))
+        self.btn_m_this.clicked.connect(lambda:self._set_month(self.m.date().addMonths(1)))
         self.btn_m_next.clicked.connect(lambda:self._set_month(self.m.date().addMonths(1)))
 
         self.y=QDateEdit(QDate.currentDate()); self.y.setCalendarPopup(True); self.y.setDisplayFormat("yyyy")
         self.btn_y_prev=QPushButton("← 前一年"); self.btn_y_this=QPushButton("今年"); self.btn_y_next=QPushButton("後一年 →")
         self.btn_y_prev.clicked.connect(lambda:self._set_year(self.y.date().addYears(-1)))
-        self.btn_y_this.clicked.connect(lambda:self._set_year(QDate.currentDate()))
+        self.btn_y_this.clicked.connect(lambda:self._set_year(self.y.date().addYears(1)))
         self.btn_y_next.clicked.connect(lambda:self._set_year(self.y.date().addYears(1)))
 
         for w in (QLabel("模式"), self.mode,
@@ -872,7 +940,8 @@ class ReportsTab(QWidget):
         with SessionLocal() as s, open(path,"w",newline="",encoding="utf-8-sig") as f:
             w=csv.writer(f); w.writerow(["日期","班別","單號","金額","備註"])
             q=s.query(Order).filter(and_(Order.date>=d1,Order.date<=d2)).order_by(asc(Order.date),asc(Order.id)).all()
-            for o in q: w.writerow([o.date.strftime("%Y-%m-%d"),o.shift.value,o.order_no,f"{float(o.amount):.0f}",o.memo or ""])
+            for o in q:
+                w.writerow([o.date.strftime("%Y-%m-%d"), shift_label(o.shift.value), o.order_no, f"{float(o.amount):.0f}", o.memo or ""])
         QMessageBox.information(self,"完成",f"已匯出：\n{path}")
 
     def exp_expenses(self):
@@ -895,11 +964,11 @@ class ReportsTab(QWidget):
             exps=s.query(Expense.date,func.sum(Expense.amount)).filter(and_(Expense.date>=d1,Expense.date<=d2)).group_by(Expense.date).all()
             o_map={}; dates=set()
             for d,sh,sumv in ords:
-                dates.add(d); o_map.setdefault(d,{Shift.MORNING:0.0,Shift.EVENING:0.0})[sh]=float(sumv or 0)
+                dates.add(d); o_map.setdefault(d,{ShiftEnum.MORNING:0.0,ShiftEnum.EVENING:0.0})[sh]=float(sumv or 0)
             x_map={d:float(v or 0) for d,v in exps}; dates.update(x_map.keys())
             for d in sorted(dates):
-                m=o_map.get(d,{Shift.MORNING:0.0,Shift.EVENING:0.0})
-                mm,me=float(m.get(Shift.MORNING,0)),float(m.get(Shift.EVENING,0))
+                m=o_map.get(d,{ShiftEnum.MORNING:0.0,ShiftEnum.EVENING:0.0})
+                mm,me=float(m.get(ShiftEnum.MORNING,0)),float(m.get(ShiftEnum.EVENING,0))
                 total=mm+me; x=float(x_map.get(d,0)); profit=total-x
                 w.writerow([d.strftime("%Y-%m-%d"),f"{mm:.0f}",f"{me:.0f}",f"{total:.0f}",f"{x:.0f}",f"{profit:.0f}"])
         QMessageBox.information(self,"完成",f"已匯出：\n{path}")
@@ -983,16 +1052,16 @@ class AiTab(QWidget):
                 else:
                     msg.append(f"🔎 單號查詢，共 {len(rs)} 筆（顯示前20）：")
                     for o in rs[:20]:
-                        msg.append(f"- {o.date.strftime('%Y-%m-%d')} {o.shift.value} 單號 {o.order_no} 金額 NT${float(o.amount):,.0f}")
+                        msg.append(f"- {o.date.strftime('%Y-%m-%d')} {shift_label(o.shift.value)} 單號 {o.order_no} 金額 NT${float(o.amount):,.0f}")
                 self.out.setText("\n".join(msg)); return
 
             rev_m=rev_e=exp=0.0
             if want_rev or want_profit or want_m or want_e:
                 if want_m or not (want_m or want_e):
-                    v=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=d1,Order.date<=d2,Order.shift==Shift.MORNING)).scalar() or 0
+                    v=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=d1,Order.date<=d2,Order.shift==ShiftEnum.MORNING)).scalar() or 0
                     rev_m=float(v)
                 if want_e or not (want_m or want_e):
-                    v=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=d1,Order.date<=d2,Order.shift==Shift.EVENING)).scalar() or 0
+                    v=s.query(func.coalesce(func.sum(Order.amount),0)).filter(and_(Order.date>=d1,Order.date<=d2,Order.shift==ShiftEnum.EVENING)).scalar() or 0
                     rev_e=float(v)
             if want_exp or want_profit:
                 v=s.query(func.coalesce(func.sum(Expense.amount),0)).filter(and_(Expense.date>=d1,Expense.date<=d2)).scalar() or 0
@@ -1124,7 +1193,7 @@ class MainWindow(QMainWindow):
             except Exception: pass
         outer=QVBoxLayout(root)
 
-        # 上方標題列（陰影拿掉，避免環境缺元件）
+        # 上方標題列
         top=QHBoxLayout()
         title_frame=QFrame(); title_frame.setObjectName("titleCapsule")
         title_frame.setStyleSheet("QFrame#titleCapsule{background:rgba(255,255,255,0.88);border-radius:14px;}")
@@ -1277,9 +1346,8 @@ class ChangeAccountDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self,"錯誤", str(e))
 
-# ====================== 進入點（登入可重試；營業額二次密碼保留） ======================
+# ====================== 進入點 ======================
 def main():
-    # 顯示啟動健檢（印到終端與快訊）
     info = preflight_checks()
     print("=== 啟動健檢 ===\n"+info+"\n================")
 

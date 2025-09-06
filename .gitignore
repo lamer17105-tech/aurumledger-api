@@ -1,4 +1,40 @@
 __pycache__/
 *.pyc
-resto.db
+*.log
+.env
 auth.json
+resto.db
+resto.db-*
+*.sqlite3
+.idea/
+error.log
+settings.json
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+error.log
+
+# Databases & backups
+*.db
+*.db-*
+*.db-shm
+*.db-wal
+*.bak.*
+data.db*
+aurum.db
+app/aurum.db
+
+# Builds
+dist/
+build/
