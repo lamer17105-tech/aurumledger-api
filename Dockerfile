@@ -1,21 +1,23 @@
-# Dockerfileï¼ˆFastAPI + Uvicornï¼Œé©??Zeaburï¼?
 FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
+
+# å»ºç??›æ“¬?°å?ä¸¦å?è£å?ä»¶ï?ä¸å???root ?„å…¨??pipï¼?
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m venv /opt/venv \
+ && /opt/venv/bin/pip install --upgrade pip \
+ && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+ENV PATH="/opt/venv/bin:${PATH}"
 
+# è¤‡è£½ç¨‹å?ç¢?
 COPY . .
-
-# ?¥å£?³æœ¬ï¼ˆå¯??Alembicï¼?
 RUN chmod +x ./entrypoint.sh
 
-# Zeabur ?ƒæ³¨??PORTï¼Œå?å¿…ç›£?½å?
-# https://zeabur.com/docs/en-US/deploy/variables
+# å»ºç???root ä½¿ç”¨?…ä¸¦?æ??·è?
+RUN adduser --disabled-password --gecos '' appuser \
+ && chown -R appuser /app
+USER appuser
+
 ENV PORT=8080
-
 CMD ["./entrypoint.sh"]
-
