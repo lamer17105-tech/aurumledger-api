@@ -10,3 +10,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+console.debug("AurumLedger UI loaded.");

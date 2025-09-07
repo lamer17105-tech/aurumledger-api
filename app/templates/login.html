@@ -1,52 +1,22 @@
 {% extends "base.html" %}
-{% block title %}登入{% endblock %}
+{% block title %}登入 ｜ AurumLedger 企業版{% endblock %}
+
 {% block content %}
+<section class="card">
+  <h1 class="card-title">餐飲作帳系統</h1>
 
-<div class="auth-only-card">
-  <div class="auth-card">
+  {% if error %}
+  <div class="alert">{{ error }}</div>
+  {% endif %}
 
-    <!-- 品牌區 -->
-    <div class="login-brand">
-      <div class="row1">
-        <span class="logo-emoji" aria-hidden="true">📊</span>
-        <div class="title"><span class="strong">AurumLedger</span> 企業版</div>
-      </div>
-      <div class="sub">餐飲作帳系統</div>
-    </div>
+  <form class="form" method="post" action="/login">
+    <label class="form-label">帳號</label>
+    <input class="form-input" type="text" name="username" placeholder="輸入登入帳號" required>
 
-    {% if error %}
-      <div class="alert error">{{ error }}</div>
-    {% endif %}
-    {% if ok %}
-      <div class="alert ok">{{ ok }}</div>
-    {% endif %}
+    <label class="form-label">密碼</label>
+    <input class="form-input" type="password" name="password" placeholder="輸入登入密碼" required>
 
-    {% if first_setup %}
-      <!-- 首次設定帳號 -->
-      <form method="post" action="/login" style="display:grid;gap:10px">
-        <input type="hidden" name="mode" value="setup">
-        <label>帳號</label>
-        <input class="input" type="text" name="username" placeholder="輸入登入帳號" required>
-        <label>密碼</label>
-        <input class="input" type="password" name="password" placeholder="輸入登入密碼" required>
-        <button class="btn primary" type="submit">建立帳號並登入</button>
-      </form>
-    {% else %}
-      <!-- 一般登入 -->
-      <form method="post" action="/login" style="display:grid;gap:10px">
-        <input type="hidden" name="mode" value="login">
-        <label>帳號</label>
-        <input class="input" type="text" name="username" value="{{ remembered or '' }}" placeholder="輸入帳號" required>
-        <label>密碼</label>
-        <input class="input" type="password" name="password" placeholder="輸入密碼" required>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:4px">
-          <!-- 預設勾選；使用者可自行取消，若取消則後端會刪除 cookie -->
-          <input type="checkbox" name="remember" checked> 記住帳號
-        </label>
-        <button class="btn primary" type="submit">登入</button>
-      </form>
-    {% endif %}
-  </div>
-</div>
-
+    <button class="btn btn-primary" type="submit">建立帳號並登入</button>
+  </form>
+</section>
 {% endblock %}
