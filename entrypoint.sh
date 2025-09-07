@@ -1,9 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 set -e
-
-# ??? Alembic????????????????????if [ -f "alembic.ini" ]; then
+if [ -f "alembic.ini" ]; then
   alembic upgrade head || { echo "Alembic migrate failed"; exit 1; }
 fi
-
-# ??? FastAPI ???
 exec uvicorn app.web_ui:app --host 0.0.0.0 --port "${PORT}"
