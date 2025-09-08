@@ -1,40 +1,7 @@
-﻿// === force-load AurumLedger CSS (gold5) ===
-(function(){
-  try{
-    if (document.querySelector('link[data-al-css]')) return;
-    var cur = (document.currentScript && document.currentScript.src) || '';
-    var cssURL = '/static/css/style.css?v=gold5';
-    if (cur && cur.indexOf('/static/js/') !== -1) {
-      cssURL = cur.split('/static/js/')[0] + '/static/css/style.css?v=gold5';
-    }
-    var l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = cssURL;
-    l.setAttribute('data-al-css','1');
-    document.head.appendChild(l);
-  }catch(e){}
-})();
-// === force-load AurumLedger CSS (gold4) ===
-(function(){
-  try{
-    if (document.querySelector('link[data-al-css]')) return;
-    var cur = (document.currentScript && document.currentScript.src) || '';
-    var cssURL = '/static/css/style.css?v=gold4';
-    if (cur && cur.indexOf('/static/js/') !== -1) {
-      cssURL = cur.split('/static/js/')[0] + '/static/css/style.css?v=gold4';
-    }
-    var l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = cssURL;
-    l.setAttribute('data-al-css','1');
-    document.head.appendChild(l);
-  }catch(e){}
-})();
-
 /* app/static/js/app.js
- * 閮/?臬嚗”?抒楊頛胯?摨??喳?賂???Shift 蝭?嚗?
- * KPI/?梯”嚗???渲??SV ?臬嚗? BOM嚗?
- * ?∪??其?鞈???base.html ?芾??仿??臬??
+ * 訂單/支出：表內編輯、排序、拖曳勾選（含 Shift 範圍）
+ * KPI/報表：日期變更自動送出、CSV 匯出（補 BOM）
+ * 無外部依賴
  */
 (function(){
   "use strict";
@@ -64,72 +31,70 @@
     }
   }
 
-  // ---------- ?剖銝 ----------
-  function paintShiftSelect(sel){
-    if(!sel) return;
-    sel.classList.remove('is-morning','is-night');
-    const v = (sel.value || sel.options?.[sel.selectedIndex]?.text || '').trim();
-    if (/??.test(v)) sel.classList.add('is-morning');
-    else if (/??.test(v)) sel.classList.add('is-night');
-  }
+  // ---------- 班別上色 ----------
   function paintShiftCell(td){
     if(!td) return;
     const t = (td.textContent||'').trim();
     td.classList.remove('shift-morning','shift-night');
-    if(/??.test(t)) td.classList.add('shift-morning');
-    else if(/??.test(t)) td.classList.add('shift-night');
+    if (/早/.test(t)) td.classList.add('shift-morning');
+    else if (/晚/.test(t)) td.classList.add('shift-night');
   }
   function paintAllShiftCells(scope){
     $$('td[data-field="shift"]', scope||document).forEach(paintShiftCell);
   }
 
-  // ---------- ??暸嚗暺? Shift 蝭?嚗?----------
+  // ---------- 拖曳勾選（最後一欄；點擊可勾、拖曳可連選、Shift 範圍） ----------
   function initDragSelect(tbody){
     if(!tbody) return;
-    const getRows = ()=> Array.from(tbody.querySelectorAll('tr'));
-    let dragging = false, targetState = false, lastIdx = -1;
 
-    // mousedown嚗?具????嚗?湔暺?checkbox嚗??汗?函???
-    on(tbody,'mousedown',(e)=>{
-      if(e.button !== 0) return;
-      const td = e.target.closest('td'); if(!td) return;
+    const isSelectCell = (td)=>{
+      if(!td) return false;
       const tr = td.parentElement;
-      const isLast = td.cellIndex === tr.cells.length - 1;
-      const cb = td.querySelector('input[type="checkbox"][name="selected"]');
-      if(!cb || !isLast) return;
+      return td.cellIndex === tr.cells.length - 1; // 確認最後一欄
+    };
+    const getRows = ()=> Array.from(tbody.querySelectorAll('tr'));
 
-      // ?湔暺?checkbox嚗?摰???嚗????嚗??啁????
+    let dragging = false;
+    let targetState = null;
+    let lastIdx = -1;
+
+    // 開始：只在「選取」欄
+    on(tbody, 'pointerdown', (e)=>{
+      if (e.button !== 0) return; // 只處理左鍵
+      const td = e.target.closest('td'); if(!td || !isSelectCell(td)) return;
+      const cb = td.querySelector('input[type="checkbox"][name="selected"]'); if(!cb) return;
+
       if (e.target === cb){
+        // 讓瀏覽器先切換，再讀取最新狀態做拖曳
         setTimeout(()=>{ targetState = cb.checked; dragging = true; }, 0);
         return;
       }
-
-      // 暺蝛箇????鞎砍???銝衣??駁脣?
+      // 點到單元格空白處 → 我們負責切換
       e.preventDefault();
       targetState = !cb.checked;
       cb.checked = targetState;
       dragging = true;
-    });
+    }, {passive:false});
 
-    // mouseover嚗??喟?????甇亙???
-    on(tbody,'mouseover',(e)=>{
+    // 拖曳經過列 → 同步套用
+    on(tbody, 'pointerenter', (e)=>{
       if(!dragging) return;
       const tr = e.target.closest('tr'); if(!tr) return;
       const cb = tr.querySelector('input[type="checkbox"][name="selected"]');
       if(cb) cb.checked = targetState;
     });
 
-    on(document,'mouseup',()=> dragging=false);
+    on(document, 'pointerup', ()=>{ dragging=false; });
 
-    // Shift+Click 蝭???
-    on(tbody,'click',(e)=>{
+    // Shift + Click 範圍勾
+    on(tbody, 'click', (e)=>{
       const cb = e.target.closest('input[type="checkbox"][name="selected"]');
       if(!cb) return;
       const rows = getRows();
-      const idx = rows.indexOf(cb.closest('tr'));
-      if(e.shiftKey && lastIdx >= 0){
+      const idx  = rows.indexOf(cb.closest('tr'));
+      if (e.shiftKey && lastIdx >= 0){
         const [a,b] = lastIdx < idx ? [lastIdx, idx] : [idx, lastIdx];
-        for(let i=a;i<=b;i++){
+        for(let i=a; i<=b; i++){
           const cbi = rows[i].querySelector('input[type="checkbox"][name="selected"]');
           if(cbi) cbi.checked = cb.checked;
         }
@@ -138,7 +103,7 @@
     });
   }
 
-  // ---------- ?銵典蝺刻摩嚗?嚗?----------
+  // ---------- 通用表內編輯 ----------
   function makeCellEditor(td, opts){
     // opts: {id, field, url, type, value, options}
     const old = opts.value;
@@ -194,18 +159,15 @@
     }
   }
 
-  // ---------- 閮??----------
+  // ---------- 訂單頁 ----------
   function initOrdersPage(){
     const table = $('#orders-table'); if(!table) return;
     const tbody = $('#orders-body') || table.tBodies[0];
 
-    // ?啣???乩?????
-    const createShiftSel = document.querySelector('.order-create select[name="shift"]');
-    if(createShiftSel){ paintShiftSelect(createShiftSel); on(createShiftSel,'change',()=>paintShiftSelect(createShiftSel)); }
-
+    // 班別上色
     paintAllShiftCells(table);
 
-    // 銵典蝺刻摩
+    // 表內編輯
     let editingNow = null;
     on(tbody,'click',(e)=>{
       const td = e.target.closest('td.editable');
@@ -219,7 +181,7 @@
       const raw = td.textContent.trim().replace(/,/g,'');
 
       let type='text', options=null;
-      if(field==='shift'){ type='select'; options=['?拍','?']; }
+      if(field==='shift'){ type='select'; options=['早班','晚班']; }
       else if(field==='amount'){ type='number'; }
       else if(field==='odt'){ type='date'; }
 
@@ -231,7 +193,7 @@
       obs.observe(td, {childList:true, subtree:true});
     });
 
-    // 銵券??
+    // 表頭排序
     const orig = Array.from(tbody.querySelectorAll('tr'));
     let currentKey = null;
     function restore(){
@@ -254,16 +216,16 @@
     }
     $$('#orders-table th.sortable').forEach(th=> on(th,'click',()=>applySort(th.dataset.key)));
 
-    // ??暸
+    // 拖曳勾選
     initDragSelect(tbody);
   }
 
-  // ---------- ?臬??----------
+  // ---------- 支出頁 ----------
   function initExpensesPage(){
     const table = $('#expenses-table'); if(!table) return;
     const tbody = $('#expenses-body') || table.tBodies[0];
 
-    const CAT_OPTIONS = ['??','蝘?','鈭箔?','?','?','蝘?瘞湧','?嗡?'];
+    const CAT_OPTIONS = ['原料','租金','人事','菜錢','雜支','租金水電','其他'];
 
     let editingNow = null;
     on(tbody,'click',(e)=>{
@@ -292,9 +254,8 @@
     initDragSelect(tbody);
   }
 
-  // ---------- KPI/?梯”嚗??渲? ----------
+  // ---------- KPI/報表：變更自動送出 ----------
   function initAutoSubmitForms(){
-    // KPI嚗ame 敹???mode / dt嚗???蝡臬停?臬????
     const kForm = $('#range-form') || $('form[action="/kpi"]');
     if(kForm){
       const modeEl = kForm.querySelector('[name="mode"]');
@@ -302,7 +263,6 @@
       on(modeEl,'change', ()=> kForm.submit());
       on(dtEl,  'change', ()=> kForm.submit());
     }
-    // Reports
     const repForm = $('#rep-form') || $('form[action="/reports"]');
     if(repForm){
       const modeEl = repForm.querySelector('[name="mode"], #rep-mode');
@@ -312,14 +272,14 @@
     }
   }
 
-  // ---------- ?臬 CSV嚗? BOM嚗?----------
+  // ---------- 匯出 CSV（補 BOM） ----------
   async function exportCsv(kind){
     const scopeEl = $('#rep-mode') || $('#mode');
     const dtEl    = $('#rep-dt')   || $('#dt') || document.querySelector('[name="dt"]');
-    if(!scopeEl || !dtEl){ alert('?曆??啣?箏???); return; }
+    if(!scopeEl || !dtEl){ alert('找不到匯出參數'); return; }
     const url = `/export/${kind}.csv?scope=${encodeURIComponent(scopeEl.value)}&base=${encodeURIComponent(dtEl.value)}`;
     const res = await fetch(url, {cache:'no-store'});
-    if(!res.ok) return alert('?臬憭望?');
+    if(!res.ok) return alert('匯出失敗');
     let buf = await res.arrayBuffer();
     let data = new Uint8Array(buf);
     if (data.length>=3 && data[0]===0xEF && data[1]===0xBB && data[2]===0xBF) data = data.slice(3);
@@ -339,4 +299,52 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+/* === KPI 金額自動縮放（不動版型，只調字級） === */
+(function(){
+  "use strict";
 
+  function fitText(el, opts){
+    const cfg = Object.assign({min: 24, step: 1}, opts||{});
+    const getMax = () => parseFloat(getComputedStyle(el).fontSize) || 56;
+
+    function run(){
+      // 先回到最大字，再往下微調直到不溢出
+      let size = getMax();
+      el.style.fontSize = size + 'px';
+
+      // 允許一點點誤差（避免高 DPI 抖動）
+      const fits = () => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1;
+
+      let guard = 0;
+      while (!fits() && size > cfg.min && guard < 200){
+        size -= cfg.step;
+        el.style.fontSize = size + 'px';
+        guard++;
+      }
+    }
+
+    run();
+
+    // 視窗/容器尺寸改變時重新套用
+    const ro = new ResizeObserver(run);
+    ro.observe(el);
+    window.addEventListener('resize', run);
+
+    // 文字內容變動時也重算（例如切換期間）
+    new MutationObserver(run).observe(el, {childList:true, characterData:true, subtree:true});
+  }
+
+  function initKpiAutoFit(){
+    document.querySelectorAll('.kpi-card .kpi-value').forEach(el=>{
+      // 一般卡給較低下限，淺紫色「營收」卡通常比較大，可再放寬一點
+      const isRevenue = el.closest('.kpi-card')?.classList.contains('kpi-net');
+      fitText(el, {min: isRevenue ? 28 : 24, step: 1});
+    });
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initKpiAutoFit);
+  }else{
+    initKpiAutoFit();
+  }
+})();
