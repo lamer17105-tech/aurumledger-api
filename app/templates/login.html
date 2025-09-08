@@ -1,47 +1,39 @@
-{% extends "base.html" %}
-{% block title %}登入{% endblock %}
+﻿{% extends "base.html" %}
 {% block content %}
+<div class="auth-card">
+  <div class="heading">
+    <div class="title">AurumLedger 企業版</div>
+    <div class="sub">
+      {% if first_setup %}首次使用：請建立管理者帳號與密碼。{% else %}請登入{% endif %}
+    </div>
+  </div>
 
-<div class="auth-only-card">
-  <div class="auth-card">
-    <!-- 登入頁 LOGO（置中、雙行） -->
-    <div style="text-align:center;margin-bottom:16px">
-      <div style="font-size:22px;font-weight:900;letter-spacing:.5px;">📊 AurumLedger 企業版</div>
-      <div style="font-size:14px;font-weight:800;color:#334155;margin-top:4px">餐飲作帳系統</div>
+  {% if error %}
+  <div class="alert">{{ error }}</div>
+  {% endif %}
+
+  <form class="auth-form" method="post" action="{{ url_for('login_submit') }}">
+    {% if first_setup %}<input type="hidden" name="mode" value="setup">{% endif %}
+
+    <div class="row">
+      <label>帳號</label>
+      <input type="text" name="username" value="{{ remembered or '' }}" required>
     </div>
 
-    {% if error %}
-      <div class="alert error">{{ error }}</div>
-    {% endif %}
+    <div class="row">
+      <label>密碼</label>
+      <input type="password" name="password" placeholder="輸入密碼" required>
+    </div>
 
-    {% if first_setup %}
-      <div class="alert ok">首次使用：請建立管理者帳號與密碼。</div>
-    {% endif %}
+    <label class="checkbox">
+      <input type="checkbox" name="remember" value="1" checked> 記住帳號
+    </label>
 
-    <form method="post" action="/login" style="display:flex;flex-direction:column;gap:12px">
-      <input type="hidden" name="mode" value="{{ 'setup' if first_setup else 'login' }}">
-
-      <label class="label" style="font-weight:700">帳號</label>
-      <input class="input" type="text" name="username" value="{{ remembered or '' }}" placeholder="輸入帳號" required autofocus>
-
-      <label class="label" style="font-weight:700">密碼</label>
-      <input class="input" type="password" name="password" placeholder="輸入密碼" required>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" name="remember" value="1" checked>
-          <span>記住帳號</span>
-        </label>
-        <div class="muted" style="font-size:12px">
-          {{ '建立帳號後可於右下角「帳號設定」變更密碼' if first_setup else '' }}
-        </div>
-      </div>
-
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
-        <button class="btn pill primary" type="submit">{{ '建立並登入' if first_setup else '登入' }}</button>
-      </div>
-    </form>
-  </div>
+    <div class="auth-actions">
+      <button class="btn primary" type="submit">
+        {% if first_setup %}建立並登入{% else %}登入{% endif %}
+      </button>
+    </div>
+  </form>
 </div>
-
 {% endblock %}

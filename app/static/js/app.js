@@ -1,3 +1,19 @@
+﻿// === force-load AurumLedger CSS (gold5) ===
+(function(){
+  try{
+    if (document.querySelector('link[data-al-css]')) return;
+    var cur = (document.currentScript && document.currentScript.src) || '';
+    var cssURL = '/static/css/style.css?v=gold5';
+    if (cur && cur.indexOf('/static/js/') !== -1) {
+      cssURL = cur.split('/static/js/')[0] + '/static/css/style.css?v=gold5';
+    }
+    var l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = cssURL;
+    l.setAttribute('data-al-css','1');
+    document.head.appendChild(l);
+  }catch(e){}
+})();
 // === force-load AurumLedger CSS (gold4) ===
 (function(){
   try{
@@ -16,9 +32,9 @@
 })();
 
 /* app/static/js/app.js
- * 訂單/支出：表內編輯、排序、拖曳勾選（含 Shift 範圍）
- * KPI/報表：日期變更自動送出、CSV 匯出（補 BOM）
- * 無外部依賴 — base.html 只載入這一支即可
+ * 閮/?臬嚗”?抒楊頛胯?摨??喳?賂???Shift 蝭?嚗?
+ * KPI/?梯”嚗???渲??SV ?臬嚗? BOM嚗?
+ * ?∪??其?鞈???base.html ?芾??仿??臬??
  */
 (function(){
   "use strict";
@@ -48,32 +64,32 @@
     }
   }
 
-  // ---------- 班別上色 ----------
+  // ---------- ?剖銝 ----------
   function paintShiftSelect(sel){
     if(!sel) return;
     sel.classList.remove('is-morning','is-night');
     const v = (sel.value || sel.options?.[sel.selectedIndex]?.text || '').trim();
-    if (/早/.test(v)) sel.classList.add('is-morning');
-    else if (/晚/.test(v)) sel.classList.add('is-night');
+    if (/??.test(v)) sel.classList.add('is-morning');
+    else if (/??.test(v)) sel.classList.add('is-night');
   }
   function paintShiftCell(td){
     if(!td) return;
     const t = (td.textContent||'').trim();
     td.classList.remove('shift-morning','shift-night');
-    if(/早/.test(t)) td.classList.add('shift-morning');
-    else if(/晚/.test(t)) td.classList.add('shift-night');
+    if(/??.test(t)) td.classList.add('shift-morning');
+    else if(/??.test(t)) td.classList.add('shift-night');
   }
   function paintAllShiftCells(scope){
     $$('td[data-field="shift"]', scope||document).forEach(paintShiftCell);
   }
 
-  // ---------- 拖曳勾選（可點可拖、含 Shift 範圍） ----------
+  // ---------- ??暸嚗暺? Shift 蝭?嚗?----------
   function initDragSelect(tbody){
     if(!tbody) return;
     const getRows = ()=> Array.from(tbody.querySelectorAll('tr'));
     let dragging = false, targetState = false, lastIdx = -1;
 
-    // mousedown：只在「選取」欄啟動；若直接點 checkbox，不擋瀏覽器的切換
+    // mousedown嚗?具????嚗?湔暺?checkbox嚗??汗?函???
     on(tbody,'mousedown',(e)=>{
       if(e.button !== 0) return;
       const td = e.target.closest('td'); if(!td) return;
@@ -82,20 +98,20 @@
       const cb = td.querySelector('input[type="checkbox"][name="selected"]');
       if(!cb || !isLast) return;
 
-      // 直接點 checkbox：讓它先切換，再開始拖曳（取新的狀態）
+      // ?湔暺?checkbox嚗?摰???嚗????嚗??啁????
       if (e.target === cb){
         setTimeout(()=>{ targetState = cb.checked; dragging = true; }, 0);
         return;
       }
 
-      // 點到空白處：我們負責切換，並立刻進入拖曳
+      // 暺蝛箇????鞎砍???銝衣??駁脣?
       e.preventDefault();
       targetState = !cb.checked;
       cb.checked = targetState;
       dragging = true;
     });
 
-    // mouseover：拖曳經過的列同步套用
+    // mouseover嚗??喟?????甇亙???
     on(tbody,'mouseover',(e)=>{
       if(!dragging) return;
       const tr = e.target.closest('tr'); if(!tr) return;
@@ -105,7 +121,7 @@
 
     on(document,'mouseup',()=> dragging=false);
 
-    // Shift+Click 範圍勾
+    // Shift+Click 蝭???
     on(tbody,'click',(e)=>{
       const cb = e.target.closest('input[type="checkbox"][name="selected"]');
       if(!cb) return;
@@ -122,7 +138,7 @@
     });
   }
 
-  // ---------- 通用表內編輯（防閃退） ----------
+  // ---------- ?銵典蝺刻摩嚗?嚗?----------
   function makeCellEditor(td, opts){
     // opts: {id, field, url, type, value, options}
     const old = opts.value;
@@ -178,18 +194,18 @@
     }
   }
 
-  // ---------- 訂單頁 ----------
+  // ---------- 閮??----------
   function initOrdersPage(){
     const table = $('#orders-table'); if(!table) return;
     const tbody = $('#orders-body') || table.tBodies[0];
 
-    // 新增列班別下拉著色
+    // ?啣???乩?????
     const createShiftSel = document.querySelector('.order-create select[name="shift"]');
     if(createShiftSel){ paintShiftSelect(createShiftSel); on(createShiftSel,'change',()=>paintShiftSelect(createShiftSel)); }
 
     paintAllShiftCells(table);
 
-    // 表內編輯
+    // 銵典蝺刻摩
     let editingNow = null;
     on(tbody,'click',(e)=>{
       const td = e.target.closest('td.editable');
@@ -203,7 +219,7 @@
       const raw = td.textContent.trim().replace(/,/g,'');
 
       let type='text', options=null;
-      if(field==='shift'){ type='select'; options=['早班','晚班']; }
+      if(field==='shift'){ type='select'; options=['?拍','?']; }
       else if(field==='amount'){ type='number'; }
       else if(field==='odt'){ type='date'; }
 
@@ -215,7 +231,7 @@
       obs.observe(td, {childList:true, subtree:true});
     });
 
-    // 表頭排序
+    // 銵券??
     const orig = Array.from(tbody.querySelectorAll('tr'));
     let currentKey = null;
     function restore(){
@@ -238,16 +254,16 @@
     }
     $$('#orders-table th.sortable').forEach(th=> on(th,'click',()=>applySort(th.dataset.key)));
 
-    // 拖曳勾選
+    // ??暸
     initDragSelect(tbody);
   }
 
-  // ---------- 支出頁 ----------
+  // ---------- ?臬??----------
   function initExpensesPage(){
     const table = $('#expenses-table'); if(!table) return;
     const tbody = $('#expenses-body') || table.tBodies[0];
 
-    const CAT_OPTIONS = ['原料','租金','人事','菜錢','雜支','租金水電','其他'];
+    const CAT_OPTIONS = ['??','蝘?','鈭箔?','?','?','蝘?瘞湧','?嗡?'];
 
     let editingNow = null;
     on(tbody,'click',(e)=>{
@@ -276,9 +292,9 @@
     initDragSelect(tbody);
   }
 
-  // ---------- KPI/報表：變更自動送出 ----------
+  // ---------- KPI/?梯”嚗??渲? ----------
   function initAutoSubmitForms(){
-    // KPI：name 必須是 mode / dt（你的後端就是吃這兩個）
+    // KPI嚗ame 敹???mode / dt嚗???蝡臬停?臬????
     const kForm = $('#range-form') || $('form[action="/kpi"]');
     if(kForm){
       const modeEl = kForm.querySelector('[name="mode"]');
@@ -296,14 +312,14 @@
     }
   }
 
-  // ---------- 匯出 CSV（補 BOM） ----------
+  // ---------- ?臬 CSV嚗? BOM嚗?----------
   async function exportCsv(kind){
     const scopeEl = $('#rep-mode') || $('#mode');
     const dtEl    = $('#rep-dt')   || $('#dt') || document.querySelector('[name="dt"]');
-    if(!scopeEl || !dtEl){ alert('找不到匯出參數'); return; }
+    if(!scopeEl || !dtEl){ alert('?曆??啣?箏???); return; }
     const url = `/export/${kind}.csv?scope=${encodeURIComponent(scopeEl.value)}&base=${encodeURIComponent(dtEl.value)}`;
     const res = await fetch(url, {cache:'no-store'});
-    if(!res.ok) return alert('匯出失敗');
+    if(!res.ok) return alert('?臬憭望?');
     let buf = await res.arrayBuffer();
     let data = new Uint8Array(buf);
     if (data.length>=3 && data[0]===0xEF && data[1]===0xBB && data[2]===0xBF) data = data.slice(3);
@@ -323,3 +339,4 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+
