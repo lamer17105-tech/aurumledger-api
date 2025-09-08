@@ -297,40 +297,6 @@ tr:hover td:not(.shift-morning):not(.shift-night){ background:rgba(0,0,0,.03) !i
 @media (max-width:560px){
   .kpi-wrap{ grid-template-columns:1fr; }
 }
-/* ===== [OVERRIDE] Orders: 班別格固定底色、hover 不反白、勾選格可點整格 ===== */
-
-/* 只讓 hover 影響非班別欄 */
-#orders-table tr:hover td:not(.shift-morning):not(.shift-night){
-  background: rgba(0,0,0,.03) !important;
-}
-
-/* 班別欄固定色（與 JS class 對齊） */
-#orders-body td[data-field="shift"].shift-morning{
-  background: linear-gradient(180deg,#FFF1BF,#FFE08C) !important;
-}
-#orders-body td[data-field="shift"].shift-night{
-  background: linear-gradient(180deg,#E6EAFF,#CCD6FF) !important;
-}
-
-/* 勾選欄位：置中、整格可點（仍保留點 checkbox 本體） */
-#orders-table td:last-child{ text-align:center; cursor:pointer; }
-#orders-table td:last-child input[type="checkbox"]{ pointer-events:auto; }
-
-/* 小正方形 + 紅勾白底（統一唯一版本） */
-input[type="checkbox"]{
-  -webkit-appearance:none; appearance:none;
-  width:14px; height:14px;
-  border:1.8px solid var(--line,#E5D7B2);
-  border-radius:2px; background:#fff;
-  display:inline-grid; place-content:center; vertical-align:middle;
-  box-shadow:none;
-}
-input[type="checkbox"]::after{
-  content:""; width:6px; height:9px; opacity:0;
-  border-right:2px solid #D33; border-bottom:2px solid #D33;
-  transform:rotate(45deg) translate(0,-1px);
-}
-input[type="checkbox"]:checked::after{ opacity:1; }
 /* ===== OVERRIDES (0910) ===== */
 
 /* A) 訂單：班別欄固定色 + hover 不覆蓋 + 勾選格可點整格 */
@@ -437,6 +403,18 @@ input[type="checkbox"]:checked::after{ opacity:1; }
 #expenses-table tr:hover td{   /* 班別欄不受 hover 影響 */
   background: rgba(0,0,0,.03) !important;
 }
+/* KPI：扣支出後卡片做成橫長、再寬一點、字體小一點 */
+.kpi-wrap{ display:grid; grid-template-columns:repeat(4,minmax(220px,1fr)); gap:24px; }
+.kpi-card.kpi-net{
+  grid-column: 1 / -1;           /* 跨整列 */
+  justify-self: center;
+  max-width: 1100px;             /* 左右更寬 */
+}
+.kpi-card.kpi-net .kpi-value{
+  font-size: 48px;               /* 比現在小 */
+  padding: 24px 20px;
+}
+.kpi-card.kpi-net .kpi-value .cur{ font-size:.55em; opacity:.85; } /* NT$ 小一點 */
 /* === KPI：把「營收」（kpi-net）卡片的標題/金額置中 === */
 .kpi-card.kpi-net .kpi-head{
   justify-content: center !important;
@@ -449,30 +427,3 @@ input[type="checkbox"]:checked::after{ opacity:1; }
   justify-content: center !important;
   text-align: center !important;
 }
-/* === KPI 金額：單行顯示，避免換行影響量測 === */
-.kpi-card .kpi-value{
-  white-space: nowrap;
-}
-/* KPI 金額單行，不讓內容換行 */
-.kpi-card .kpi-value{ white-space:nowrap; }
-
-/* 營收卡的數字置中（不改卡片尺寸與布局） */
-.kpi-card.kpi-net .kpi-value{ justify-content:center; }
-/* ===== Mobile safe block (不影響桌面) ===== */
-html { -webkit-text-size-adjust: 100%; }            /* iOS 不自動放大字 */
-input, select, textarea { font-size: 16px; }        /* 避免 iOS 聚焦強制放大頁面 */
-
-@media (max-width: 900px){
-  .kpi-wrap{ grid-template-columns: repeat(2, minmax(220px,1fr)); }
-  .kpi-card.kpi-net{ grid-column: 1 / -1; }        /* 營收卡跨一列 */
-}
-@media (max-width: 560px){
-  .kpi-wrap{ grid-template-columns: 1fr; }
-  .kpi-card .kpi-value{ font-size: 42px; }         /* 極小裝置基準字級（仍會被 autosize 再縮） */
-}
-
-/* 手機點選「選取」欄位更好點 */
-.cb-cell label.cb-hit{ min-height: 36px; }
-
-/* Android 點擊時的水波/高亮不要干擾 */
-* { -webkit-tap-highlight-color: rgba(0,0,0,0); }

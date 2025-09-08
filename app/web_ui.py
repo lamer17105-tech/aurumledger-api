@@ -1,4 +1,3 @@
-# app/web_ui.py
 from __future__ import annotations
 from pathlib import Path
 from datetime import date, datetime, timedelta
@@ -150,7 +149,7 @@ def _nav(mode: str, dt: Optional[str]) -> Dict[str,str]:
 # -------------- routes --------------
 @app.get("/")
 def root():
-    return RedirectResponse("/orders")
+    return RedirectResponse("/login")
 
 # ---------- Auth ----------
 @app.get("/login")

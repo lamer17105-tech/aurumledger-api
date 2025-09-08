@@ -1,7 +1,7 @@
 /* app/static/js/app.js
  * 訂單/支出：表內編輯、排序、拖曳勾選（含 Shift 範圍）
  * KPI/報表：日期變更自動送出、CSV 匯出（補 BOM）
- * 無外部依賴
+ * 無外部依賴 — base.html 只載入這一支即可
  */
 (function(){
   "use strict";
@@ -32,69 +32,71 @@
   }
 
   // ---------- 班別上色 ----------
+  function paintShiftSelect(sel){
+    if(!sel) return;
+    sel.classList.remove('is-morning','is-night');
+    const v = (sel.value || sel.options?.[sel.selectedIndex]?.text || '').trim();
+    if (/早/.test(v)) sel.classList.add('is-morning');
+    else if (/晚/.test(v)) sel.classList.add('is-night');
+  }
   function paintShiftCell(td){
     if(!td) return;
     const t = (td.textContent||'').trim();
     td.classList.remove('shift-morning','shift-night');
-    if (/早/.test(t)) td.classList.add('shift-morning');
-    else if (/晚/.test(t)) td.classList.add('shift-night');
+    if(/早/.test(t)) td.classList.add('shift-morning');
+    else if(/晚/.test(t)) td.classList.add('shift-night');
   }
   function paintAllShiftCells(scope){
     $$('td[data-field="shift"]', scope||document).forEach(paintShiftCell);
   }
 
-  // ---------- 拖曳勾選（最後一欄；點擊可勾、拖曳可連選、Shift 範圍） ----------
+  // ---------- 拖曳勾選（可點可拖、含 Shift 範圍） ----------
   function initDragSelect(tbody){
     if(!tbody) return;
-
-    const isSelectCell = (td)=>{
-      if(!td) return false;
-      const tr = td.parentElement;
-      return td.cellIndex === tr.cells.length - 1; // 確認最後一欄
-    };
     const getRows = ()=> Array.from(tbody.querySelectorAll('tr'));
+    let dragging = false, targetState = false, lastIdx = -1;
 
-    let dragging = false;
-    let targetState = null;
-    let lastIdx = -1;
+    // mousedown：只在「選取」欄啟動；若直接點 checkbox，不擋瀏覽器的切換
+    on(tbody,'mousedown',(e)=>{
+      if(e.button !== 0) return;
+      const td = e.target.closest('td'); if(!td) return;
+      const tr = td.parentElement;
+      const isLast = td.cellIndex === tr.cells.length - 1;
+      const cb = td.querySelector('input[type="checkbox"][name="selected"]');
+      if(!cb || !isLast) return;
 
-    // 開始：只在「選取」欄
-    on(tbody, 'pointerdown', (e)=>{
-      if (e.button !== 0) return; // 只處理左鍵
-      const td = e.target.closest('td'); if(!td || !isSelectCell(td)) return;
-      const cb = td.querySelector('input[type="checkbox"][name="selected"]'); if(!cb) return;
-
+      // 直接點 checkbox：讓它先切換，再開始拖曳（取新的狀態）
       if (e.target === cb){
-        // 讓瀏覽器先切換，再讀取最新狀態做拖曳
         setTimeout(()=>{ targetState = cb.checked; dragging = true; }, 0);
         return;
       }
-      // 點到單元格空白處 → 我們負責切換
+
+      // 點到空白處：我們負責切換，並立刻進入拖曳
       e.preventDefault();
       targetState = !cb.checked;
       cb.checked = targetState;
       dragging = true;
-    }, {passive:false});
+    });
 
-    // 拖曳經過列 → 同步套用
-    on(tbody, 'pointerenter', (e)=>{
+    // mouseover：拖曳經過的列同步套用
+    on(tbody,'mouseover',(e)=>{
       if(!dragging) return;
       const tr = e.target.closest('tr'); if(!tr) return;
       const cb = tr.querySelector('input[type="checkbox"][name="selected"]');
       if(cb) cb.checked = targetState;
     });
 
-    on(document, 'pointerup', ()=>{ dragging=false; });
+    on(document,'mouseup',()=> dragging=false);
 
-    // Shift + Click 範圍勾
-    on(tbody, 'click', (e)=>{
+    // Shift+Click 範圍勾
+    on(tbody,'click',(e)=>{
       const cb = e.target.closest('input[type="checkbox"][name="selected"]');
       if(!cb) return;
       const rows = getRows();
-      const idx  = rows.indexOf(cb.closest('tr'));
-      if (e.shiftKey && lastIdx >= 0){
+      const idx = rows.indexOf(cb.closest('tr'));
+      if(e.shiftKey && lastIdx >= 0){
         const [a,b] = lastIdx < idx ? [lastIdx, idx] : [idx, lastIdx];
-        for(let i=a; i<=b; i++){
+        for(let i=a;i<=b;i++){
           const cbi = rows[i].querySelector('input[type="checkbox"][name="selected"]');
           if(cbi) cbi.checked = cb.checked;
         }
@@ -103,7 +105,7 @@
     });
   }
 
-  // ---------- 通用表內編輯 ----------
+  // ---------- 通用表內編輯（防閃退） ----------
   function makeCellEditor(td, opts){
     // opts: {id, field, url, type, value, options}
     const old = opts.value;
@@ -164,7 +166,10 @@
     const table = $('#orders-table'); if(!table) return;
     const tbody = $('#orders-body') || table.tBodies[0];
 
-    // 班別上色
+    // 新增列班別下拉著色
+    const createShiftSel = document.querySelector('.order-create select[name="shift"]');
+    if(createShiftSel){ paintShiftSelect(createShiftSel); on(createShiftSel,'change',()=>paintShiftSelect(createShiftSel)); }
+
     paintAllShiftCells(table);
 
     // 表內編輯
@@ -256,6 +261,7 @@
 
   // ---------- KPI/報表：變更自動送出 ----------
   function initAutoSubmitForms(){
+    // KPI：name 必須是 mode / dt（你的後端就是吃這兩個）
     const kForm = $('#range-form') || $('form[action="/kpi"]');
     if(kForm){
       const modeEl = kForm.querySelector('[name="mode"]');
@@ -263,6 +269,7 @@
       on(modeEl,'change', ()=> kForm.submit());
       on(dtEl,  'change', ()=> kForm.submit());
     }
+    // Reports
     const repForm = $('#rep-form') || $('form[action="/reports"]');
     if(repForm){
       const modeEl = repForm.querySelector('[name="mode"], #rep-mode');
@@ -298,53 +305,4 @@
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
-})();
-/* === KPI 金額自動縮放（不動版型，只調字級） === */
-(function(){
-  "use strict";
-
-  function fitText(el, opts){
-    const cfg = Object.assign({min: 24, step: 1}, opts||{});
-    const getMax = () => parseFloat(getComputedStyle(el).fontSize) || 56;
-
-    function run(){
-      // 先回到最大字，再往下微調直到不溢出
-      let size = getMax();
-      el.style.fontSize = size + 'px';
-
-      // 允許一點點誤差（避免高 DPI 抖動）
-      const fits = () => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1;
-
-      let guard = 0;
-      while (!fits() && size > cfg.min && guard < 200){
-        size -= cfg.step;
-        el.style.fontSize = size + 'px';
-        guard++;
-      }
-    }
-
-    run();
-
-    // 視窗/容器尺寸改變時重新套用
-    const ro = new ResizeObserver(run);
-    ro.observe(el);
-    window.addEventListener('resize', run);
-
-    // 文字內容變動時也重算（例如切換期間）
-    new MutationObserver(run).observe(el, {childList:true, characterData:true, subtree:true});
-  }
-
-  function initKpiAutoFit(){
-    document.querySelectorAll('.kpi-card .kpi-value').forEach(el=>{
-      // 一般卡給較低下限，淺紫色「營收」卡通常比較大，可再放寬一點
-      const isRevenue = el.closest('.kpi-card')?.classList.contains('kpi-net');
-      fitText(el, {min: isRevenue ? 28 : 24, step: 1});
-    });
-  }
-
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', initKpiAutoFit);
-  }else{
-    initKpiAutoFit();
-  }
 })();
