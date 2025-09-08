@@ -1,12 +1,8 @@
 // === force-load AurumLedger CSS (gold4) ===
 (function(){
   try{
-    // 如果已經有就不重複掛
     if (document.querySelector('link[data-al-css]')) return;
-
-    // 由當前 script 的 src 推導根路徑，確保支援 ROOT_PATH（例如 /aurum）
     var cur = (document.currentScript && document.currentScript.src) || '';
-    // 例： https://host/aurum/static/js/app.js?v=xxx  → https://host/aurum/static/css/style.css?v=gold4
     var cssURL = '/static/css/style.css?v=gold4';
     if (cur && cur.indexOf('/static/js/') !== -1) {
       cssURL = cur.split('/static/js/')[0] + '/static/css/style.css?v=gold4';
@@ -16,8 +12,9 @@
     l.href = cssURL;
     l.setAttribute('data-al-css','1');
     document.head.appendChild(l);
-  }catch(e){ /* 靜默失敗即可 */ }
+  }catch(e){}
 })();
+
 /* app/static/js/app.js
  * 訂單/支出：表內編輯、排序、拖曳勾選（含 Shift 範圍）
  * KPI/報表：日期變更自動送出、CSV 匯出（補 BOM）
