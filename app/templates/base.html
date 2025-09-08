@@ -10,19 +10,19 @@
     {% if not auth_only %}
     <aside class="sidebar">
       <div class="brand">
-        <a href="/orders" class="brand-link" style="text-decoration:none;color:inherit;display:inline-block">
+        <a href="{{ url_for('orders_page') }}" class="brand-link" style="text-decoration:none;color:inherit;display:inline-block">
           <div class="brand-title nowrap">📊 AurumLedger 企業版</div>
           <div class="brand-sub nowrap">餐飲作帳系統</div>
         </a>
       </div>
       <nav class="nav">
         {% set path = request.url.path %}
-        <a class="nav-item {% if path.startswith('/orders') %}active{% endif %}"  href="/orders">📄 訂單</a>
-        <a class="nav-item {% if path.startswith('/expenses') %}active{% endif %}" href="/expenses">💸 支出</a>
-        <a class="nav-item {% if path.startswith('/kpi') %}active{% endif %}"      href="/kpi">📈 營業額</a>
-        <a class="nav-item {% if path.startswith('/reports') %}active{% endif %}"  href="/reports">📊 報表</a>
-        <a class="nav-item {% if path.startswith('/ai') %}active{% endif %}"       href="/ai">🤖 AI 智能助手</a>
-        <a class="nav-item {% if path.startswith('/backup') %}active{% endif %}"   href="/backup">🧰 備份</a>
+        <a class="nav-item {% if '/orders' in path %}active{% endif %}"  href="{{ url_for('orders_page') }}">📄 訂單</a>
+        <a class="nav-item {% if '/expenses' in path %}active{% endif %}" href="{{ url_for('expenses_page') }}">💸 支出</a>
+        <a class="nav-item {% if '/kpi' in path %}active{% endif %}"      href="{{ url_for('kpi_page') }}">📈 營業額</a>
+        <a class="nav-item {% if '/reports' in path %}active{% endif %}"  href="{{ url_for('reports_page') }}">📊 報表</a>
+        <a class="nav-item {% if '/ai' in path %}active{% endif %}"       href="{{ url_for('ai_page') }}">🤖 AI 智能助手</a>
+        <a class="nav-item {% if '/backup' in path %}active{% endif %}"   href="{{ url_for('backup_page') }}">🧰 備份</a>
       </nav>
     </aside>
     {% endif %}
@@ -36,10 +36,10 @@
     {% if not auth_only %}
     <div class="corner-actions">
       {% if user %}
-        <a class="btn pill" href="/account">帳號設定</a>
-        <a class="btn pill danger" href="/logout">登出</a>
+        <a class="btn pill" href="{{ url_for('account_page') }}">帳號設定</a>
+        <a class="btn pill danger" href="{{ url_for('logout') }}">登出</a>
       {% else %}
-        <a class="btn pill primary" href="/login">登入</a>
+        <a class="btn pill primary" href="{{ url_for('login_page') }}">登入</a>
       {% endif %}
     </div>
     {% endif %}
@@ -83,7 +83,7 @@
 
     /* B) 訂單：快速搜尋（清空→回全部；搜尋完自動回焦） */
     function ordersQuickSearch(){
-      if (!/^\/orders(\/|$)/.test(PATH)) return;
+      if (!/\/orders(\/|$)/.test(PATH)) return;  // 支援子路徑
       const toolbar = document.querySelector('.toolbar, .search-bar, .filter-bar');
       if (!toolbar) return;
       const q = toolbar.querySelector('input[name="q"]') || toolbar.querySelector('input[type="text"],input[type="search"]');
@@ -94,7 +94,7 @@
         const v = q.value || '';
         if (prev && !v && location.search) {
           sessionStorage.setItem('orders_focus_search','1');
-          location.href = '/orders#search';
+          location.href = '{{ url_for("orders_page") }}#search';
         }
         prev = v;
       });
@@ -136,7 +136,7 @@
 
     /* D) 新增送出後回焦「單號」：配合 /orders.html 的 #order_no_input */
     function focusOrderNoAfterCreate(){
-      if (!/^\/orders(\/|$)/.test(PATH)) return;
+      if (!/\/orders(\/|$)/.test(PATH)) return;  // 支援子路徑
       const input = document.getElementById('order_no_input')
                  || document.querySelector('input[name="order_no"]');
       if (!input) return;
@@ -156,12 +156,12 @@
   </script>
 
   <!-- 全站主力 JS（含拖曳勾選、內嵌編輯、報表匯出、表單自動送出等） -->
-  <script src="/static/js/app.js?v=dragfix1"></script>
+  <script src="{{ url_for('static', path='/js/app.js') }}?v=dragfix1"></script>
 
   <!-- === KPI 金額自動縮放（只調字級；不改卡片結構/尺寸） === -->
   <script>
   (function(){
-    if (!/^\/kpi(\/|$)/.test(location.pathname)) return;
+    if (!/\/kpi(\/|$)/.test(location.pathname)) return;  // 支援子路徑
 
     const MIN_FONT = 26;   // 最小字級
     const PAD = 6;         // 邊緣緩衝
