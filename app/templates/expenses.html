@@ -2,96 +2,75 @@
 {% block title %}支出{% endblock %}
 {% block content %}
 
-{# 依模式切換按鈕文字與標籤 #}
-{% set prev_label   = '前一天' if mode=='day' else ('前一月' if mode=='month' else '前一年') %}
-{% set today_label  = '今日'   if mode=='day' else ('今月'   if mode=='month' else '今年') %}
-{% set next_label   = '後一天' if mode=='day' else ('後一月' if mode=='month' else '後一年') %}
-{% set date_label   = '日期'   if mode=='day' else ('月份'   if mode=='month' else '年份') %}
-
-<style>
-  /* 五欄平均等寬 + 內容過長省略 */
-  .table--expenses{ table-layout:fixed; width:100%; }
-  .table--expenses col{ width:20%; }
-  .table--expenses th, .table--expenses td{
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  /* 內嵌編輯輸入框寬度調整，避免超出格線 */
-  .table--expenses .cell-editor{ width:100%; box-sizing:border-box; }
-</style>
+{% set prev_label  = '前一天' if mode=='day' else ('前一月' if mode=='month' else '前一年') %}
+{% set today_label = '今日'   if mode=='day' else ('今月'   if mode=='month' else '今年') %}
+{% set next_label  = '後一天' if mode=='day' else ('後一月' if mode=='month' else '後一年') %}
+{% set date_label  = '日期'   if mode=='day' else ('月份'   if mode=='month' else '年份') %}
 
 <div class="card toolbar toolbar--range">
-  <form method="get" action="/expenses" class="row" style="gap:10px;flex-wrap:wrap;align-items:center">
+  <form id="range-form" method="get" action="/expenses" class="row">
     <label class="label">模式</label>
-    <select name="mode" id="exp-mode">
+    <select name="mode" id="mode">
       <option value="day"   {% if mode=='day' %}selected{% endif %}>當日</option>
       <option value="month" {% if mode=='month' %}selected{% endif %}>當月</option>
       <option value="year"  {% if mode=='year' %}selected{% endif %}>當年</option>
     </select>
 
     <label class="label">{{ date_label }}</label>
-    <input type="date" name="dt" id="exp-dt" value="{{ dt }}">
+    <input type="date" name="dt" id="dt" value="{{ dt }}">
 
     <a class="btn pill primary" href="/expenses?mode={{ mode }}&dt={{ nav.prev }}">← {{ prev_label }}</a>
     <a class="btn pill primary" href="/expenses?mode={{ mode }}&dt={{ nav.today }}">{{ today_label }}</a>
     <a class="btn pill primary" href="/expenses?mode={{ mode }}&dt={{ nav.next }}">{{ next_label }} →</a>
 
-    <label class="label">搜尋</label><input class="input" type="text" name="q" value="{{ q }}">
-    <label class="label">起</label><input class="input" type="date" name="start" value="{{ start }}">
-    <label class="label">迄</label><input class="input" type="date" name="end" value="{{ end }}">
-    <button class="btn pill" type="submit" style="white-space:nowrap">🔎</button>
+    <span class="muted" style="margin-left:8px">期間：{{ start }} ~ {{ end }}</span>
   </form>
 </div>
 
-<form class="card toolbar" method="post" action="/expenses/create" style="gap:10px;align-items:center">
-  <label>{{ date_label }}</label><input class="input" type="date" name="odt" value="{{ dt }}">
-  <label>分類</label>
-  <!-- 分類下拉選單（固定選項） -->
-  <select class="input" name="cat" required>
-    <option>原料</option>
-    <option>租金</option>
-    <option>人事</option>
-    <option>菜錢</option>
-    <option>雜支</option>
-    <option>租金水電</option>
-    <option>其他</option>
-  </select>
-  <label>金額</label><input class="input" type="number" name="amount" step="1" required>
-  <label>備註</label><input class="input" type="text" name="memo" placeholder="可留空">
-  <button class="btn primary" type="submit">新增</button>
+<form class="card toolbar" method="get" action="/expenses" style="align-items:center">
+  <input type="hidden" name="mode" value="{{ mode }}">
+  <input type="hidden" name="dt" value="{{ dt }}">
+  <label class="label">關鍵字</label>
+  <input class="input" type="text" name="q" value="{{ q }}" placeholder="搜尋分類或備註（清空=全部）">
+  <label class="label">起</label>
+  <input class="input" type="date" name="start" value="{{ start }}">
+  <label class="label">迄</label>
+  <input class="input" type="date" name="end" value="{{ end }}">
+  <button class="btn pill primary" type="submit">🔎 搜尋</button>
 </form>
 
-<form method="post" action="/expenses/delete" id="form-exp-delete">
+<form class="card toolbar" method="post" action="/expenses/create" id="form-create-exp">
+  <div class="row"><label>日期</label><input class="input" type="date" name="odt" value="{{ dt }}"></div>
+  <div class="row"><label>分類</label>
+    <select class="input" name="cat" required>
+      <option>原料</option><option>租金</option><option>人事</option>
+      <option>菜錢</option><option>雜支</option><option>租金水電</option><option>其他</option>
+    </select>
+  </div>
+  <div class="row"><label>金額</label><input class="input" type="number" name="amount" step="1" placeholder="如 1200" required></div>
+  <div class="row" style="min-width:260px"><label>備註</label><input class="input" type="text" name="memo" placeholder="選填"></div>
+  <button class="btn btn-primary" type="submit">新增</button>
+</form>
+
+<form method="post" action="/expenses/delete" id="form-delete-exp">
   <table class="table table--expenses" id="expenses-table">
-    <!-- 五欄平均 20% -->
     <colgroup>
-      <col><col><col><col><col>
+      <col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%">
     </colgroup>
     <thead>
       <tr>
-        <th class="center sortable" data-key="cat">
-          <span class="th-label">分類</span>
-          <span class="th-badge" title="可點擊排序／再點一次恢復" aria-label="可點擊排序">⇅</span>
-        </th>
-        <th class="center sortable" data-key="amount">
-          <span class="th-label">金額</span>
-          <span class="th-badge" title="可點擊排序／再點一次恢復" aria-label="可點擊排序">⇅</span>
-        </th>
-        <th class="center sortable" data-key="odt">
-          <span class="th-label">{{ date_label }}</span>
-          <span class="th-badge" title="可點擊排序／再點一次恢復" aria-label="可點擊排序">⇅</span>
-        </th>
-        <th class="center sortable" data-key="memo">
-          <span class="th-label">備註</span>
-          <span class="th-badge" title="可點擊排序／再點一次恢復" aria-label="可點擊排序">⇅</span>
-        </th>
+        <th class="center">分類</th>
+        <th class="center">金額</th>
+        <th class="center">日期</th>
+        <th class="center">備註</th>
         <th class="center">選取</th>
       </tr>
     </thead>
-    <tbody id="exp-body">
+    <tbody id="expenses-body">
       {% for it in items %}
-      <tr data-id="{{ it.id }}" data-idx="{{ loop.index0 }}">
+      <tr data-id="{{ it.id }}">
         <td class="center editable" data-field="cat">{{ it.cat }}</td>
-        <td class="center editable" data-field="amount">{{ it.amount | money }}</td>
+        <td class="center editable" data-field="amount">{{ it.amount|money }}</td>
         <td class="center editable" data-field="odt">{{ it.odt }}</td>
         <td class="center editable" data-field="memo">{{ it.memo }}</td>
         <td class="center"><input type="checkbox" name="selected" value="{{ it.id }}"></td>
@@ -106,127 +85,4 @@
   </div>
 </form>
 
-<script>
-(function(){
-  // 自動提交模式/日期切換
-  const m=document.getElementById('exp-mode'); const d=document.getElementById('exp-dt');
-  if(m) m.addEventListener('change',()=>m.form.submit());
-  if(d) d.addEventListener('change',()=>d.form.submit());
-
-  // ===== 表內編輯 =====
-  const tbody = document.getElementById('exp-body');
-  let editing = null;
-
-  function makeEditor(td){
-    const field = td.dataset.field;
-    const tr = td.closest('tr');
-    const id = tr.dataset.id;
-    const oldTxt = td.innerText.trim();
-    let input;
-
-    if(field === 'odt'){
-      input = document.createElement('input'); input.type='date'; input.value = oldTxt;
-    }else if(field === 'amount'){
-      input = document.createElement('input'); input.type='number'; input.step='1';
-      input.value = oldTxt.replaceAll(',','');
-    }else if(field === 'cat'){
-      // 分類：下拉選單（與新增一致）
-      input = document.createElement('select');
-      ["原料","租金","人事","菜錢","雜支","租金水電","其他"].forEach(s=>{
-        const o=document.createElement('option'); o.textContent=s; o.value=s;
-        if(s===oldTxt) o.selected=true; input.appendChild(o);
-      });
-    }else{ // memo
-      input = document.createElement('input'); input.type='text'; input.value = oldTxt;
-    }
-    input.className = 'cell-editor center';
-    input.style.textAlign = 'center';
-
-    td.dataset.old = oldTxt;
-    td.innerHTML = ''; td.appendChild(input); input.focus(); if(input.select) input.select();
-
-    const save = ()=>{
-      const value = (input.value || '').trim();
-      fetch('/expenses/update-json', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id, field, value})
-      }).then(r=>r.json()).then(j=>{
-        td.innerHTML = j.ok ? (field==='amount' ? Number(j.value).toLocaleString() : j.value) : td.dataset.old;
-        editing = null;
-      }).catch(()=>{ td.innerHTML = td.dataset.old; editing=null; });
-    };
-    const cancel = ()=>{ td.innerHTML = td.dataset.old; editing=null; };
-
-    if (input.tagName === 'SELECT'){ input.addEventListener('change', save); }
-    input.addEventListener('keydown', (e)=>{
-      if(e.key==='Enter'){ e.preventDefault(); save(); }
-      if(e.key==='Escape'){ e.preventDefault(); cancel(); }
-    });
-    input.addEventListener('blur', ()=>{ if(editing) save(); });
-    editing = {td, input};
-  }
-
-  tbody.addEventListener('click', (e)=>{
-    const td = e.target.closest('td.editable');
-    if(!td || editing) return;
-    makeEditor(td);
-  });
-
-  // ===== 表頭排序（再次點擊恢復原序） =====
-  const table  = document.getElementById('expenses-table');
-  const orig   = Array.from(tbody.querySelectorAll('tr'));
-  let currentKey = null;
-
-  function applySort(key){
-    if(currentKey === key){
-      tbody.innerHTML = '';
-      orig.forEach(tr=>tbody.appendChild(tr));
-      currentKey = null; return;
-    }
-    const rows = Array.from(orig);
-    rows.sort((a,b)=>{
-      const ta = a.querySelector(`[data-field="${key}"]`).innerText.trim().replace(/,/g,'');
-      const tb = b.querySelector(`[data-field="${key}"]`).innerText.trim().replace(/,/g,'');
-      if(key==='amount'){ return (Number(ta)-Number(tb)); }
-      return (ta>tb?1:ta<tb?-1:0);
-    });
-    tbody.innerHTML = '';
-    rows.forEach(tr=>tbody.appendChild(tr));
-    currentKey = key;
-  }
-  table.querySelectorAll('th.sortable').forEach(th=>{
-    th.addEventListener('click', ()=>applySort(th.dataset.key));
-  });
-
-  // ===== 拖曳勾選 + Shift 範圍勾選 =====
-  let dragging = false, dragState = true, lastClickIndex = null;
-
-  tbody.addEventListener('mousedown', (e)=>{
-    const cell = e.target.closest('td'); if(!cell) return;
-    const cb = cell.querySelector('input[type="checkbox"]'); if(!cb) return;
-    dragging = true; dragState = !cb.checked; cb.checked = dragState; e.preventDefault();
-  });
-  tbody.addEventListener('mouseover', (e)=>{
-    if(!dragging) return;
-    const tr = e.target.closest('tr'); if(!tr) return;
-    const cb = tr.querySelector('input[type="checkbox"]'); if(cb) cb.checked = dragState;
-  });
-  document.addEventListener('mouseup', ()=> dragging = false);
-
-  tbody.addEventListener('click', (e)=>{
-    const cb = e.target.closest('input[type="checkbox"]'); if(!cb) return;
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    const idx  = rows.indexOf(cb.closest('tr'));
-    if(e.shiftKey && lastClickIndex != null){
-      const [s,eidx] = idx > lastClickIndex ? [lastClickIndex, idx] : [idx, lastClickIndex];
-      for(let i=s;i<=eidx;i++){
-        const cbi = rows[i].querySelector('input[type="checkbox"]');
-        if(cbi) cbi.checked = cb.checked;
-      }
-    }
-    lastClickIndex = idx;
-  });
-})();
-</script>
 {% endblock %}

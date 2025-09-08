@@ -1,19 +1,104 @@
 {% extends "base.html" %}
 {% block title %}帳號設定{% endblock %}
 {% block content %}
-<div class="card">
-  <h3 style="margin-top:0">帳號設定</h3>
-  {% if ok %}<div class="alert ok">{{ ok }}</div>{% endif %}
-  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
-  <form method="post" action="/account/update" class="toolbar" style="flex-direction:column;align-items:stretch;gap:12px">
-    <div style="display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center">
-      <label>目前帳號</label><input class="input" type="text" value="{{ username }}" disabled>
-      <label>新帳號</label><input class="input" type="text" name="new_username" placeholder="留空不變更">
-      <label>新密碼</label><input class="input" type="password" name="new_password" placeholder="留空不變更">
-      <label>KPI 二次密碼</label><input class="input" type="password" name="new_kpi_pin" placeholder="選填：查看 KPI 需要輸入">
-      <label>目前密碼（必填）</label><input class="input" type="password" name="current_password" required>
-    </div>
-    <div><button class="btn primary pill" type="submit">儲存</button></div>
-  </form>
+
+<style>
+/* —— 只作用於本頁的輕量樣式 —— */
+.account-page{
+  min-height: calc(100vh - 32px);
+  display:flex; align-items:center; justify-content:center;
+  padding:24px;
+}
+.account-card{
+  width:100%; max-width:720px;
+  background:#fff; border:1px solid var(--line, #E5D7B2);
+  border-radius:18px; box-shadow: var(--shadow, 0 10px 25px rgba(15,23,42,.06));
+  padding:22px;
+}
+.account-title{ font-size:20px; font-weight:900; margin:6px 0 14px; }
+
+.account-form{ display:flex; flex-direction:column; gap:12px; }
+.account-form .row{ display:flex; flex-direction:column; gap:6px; }
+.account-form label{ font-weight:700; color:#334155; }
+.account-form input{
+  height:40px; padding:0 12px; border:1px solid var(--line, #E5D7B2);
+  border-radius:12px; background:#fff;
+}
+.hint{ font-size:12px; color:#64748b; }
+
+.account-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:8px; }
+.btn.save-red{
+  background:#ef4444; border:1px solid #ef4444; color:#fff;
+  border-radius:12px; height:40px; padding:0 16px; cursor:pointer;
+}
+
+/* 成功/錯誤訊息 */
+.alert{ padding:10px 12px; border-radius:12px; margin:8px 0; }
+.alert.ok{ background:#ecffef; color:#065f46; border:1px solid #bff7c7; }
+.alert.error{ background:#ffefef; color:#7f1d1d; border:1px solid #ffd3d3; }
+
+/* 小螢幕優化 */
+@media (max-width: 560px){
+  .account-card{ padding:18px; }
+}
+</style>
+
+<div class="account-page">
+  <div class="account-card">
+    <div class="account-title">帳號設定</div>
+
+    {% if ok %}
+      <div class="alert ok">✅ {{ ok }}</div>
+    {% endif %}
+    {% if error %}
+      <div class="alert error">⚠️ {{ error }}</div>
+    {% endif %}
+
+    <!-- 對齊後端 POST /account/update 的欄位名稱 -->
+    <form class="account-form" method="post" action="{{ request.scope.get('root_path','') }}/account/update">
+      <!-- 目前密碼（必填，用來驗證變更） -->
+      <div class="row">
+        <label for="current_password">目前密碼（必填）</label>
+        <input id="current_password" name="current_password" type="password" required placeholder="請輸入目前密碼">
+        <div class="hint">為了安全，變更任何資訊都需要先驗證目前密碼。</div>
+      </div>
+
+      <!-- 帳號（可更改） -->
+      <div class="row">
+        <label for="new_username">新帳號（留空=不變）</label>
+        <input id="new_username" name="new_username" type="text" value="{{ username or '' }}" placeholder="輸入新帳號；留空則維持 {{ username or '' }}">
+      </div>
+
+      <!-- 新密碼（選填） -->
+      <div class="row">
+        <label for="new_password">新密碼（選填）</label>
+        <input id="new_password" name="new_password" type="password" placeholder="變更密碼時再填；留空則不變">
+      </div>
+
+      <!-- KPI PIN（選填，二次驗證） -->
+      <div class="row">
+        <label for="new_kpi_pin">KPI 二次密碼（選填）</label>
+        <input id="new_kpi_pin" name="new_kpi_pin" type="password" placeholder="設定或重設 KPI 檢視的二次密碼（選填）">
+        <div class="hint">開啟後，進入「營業額」頁會要求輸入此 PIN。</div>
+      </div>
+
+      <div class="account-actions">
+        <button class="btn save-red" type="submit">儲存變更</button>
+      </div>
+    </form>
+  </div>
 </div>
+
+<script>
+/* UX 加強：送出後避免重複送出、顯示處理中 */
+(function(){
+  const form = document.querySelector('.account-form');
+  if(!form) return;
+  form.addEventListener('submit', function(){
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn){ btn.disabled = true; btn.textContent = '儲存中…'; }
+  });
+})();
+</script>
+
 {% endblock %}

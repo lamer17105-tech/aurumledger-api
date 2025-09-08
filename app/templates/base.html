@@ -1,35 +1,184 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% block title %}AurumLedger 企業版{% endblock %}</title>
-
-  <!-- 關鍵：正確載入靜態 CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
-  {% block extra_css %}{% endblock %}
+  <meta charset="utf-8">
+  <title>{% block title %}AurumLedger{% endblock %}｜AurumLedger 企業版</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% set rp = request.scope.get('root_path','') %}
+  <!-- 單一 CSS（跟著 root_path 走） -->
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}?v=20250909c">
 </head>
-<body>
-  <header class="al-header">
-    <div class="container">
-      <div class="brand">📚 AurumLedger 企業版</div>
+<body data-rootpath="{{ rp }}">
+  <div class="app {% if auth_only %}auth-only{% endif %}">
+    {% if not auth_only %}
+    <aside class="sidebar">
+      <div class="brand">
+        <a href="{{ rp }}/orders" class="brand-link" style="text-decoration:none;color:inherit;display:inline-block">
+          <div class="brand-title nowrap">📊 AurumLedger 企業版</div>
+          <div class="brand-sub nowrap">餐飲作帳系統</div>
+        </a>
+      </div>
       <nav class="nav">
-        <a href="/">首頁</a>
-        <a href="/login">登入</a>
-        <a href="/docs" target="_blank">API</a>
+        {% set path = request.url.path %}
+        <a class="nav-item {% if path.startswith(rp ~ '/orders') %}active{% endif %}"  href="{{ rp }}/orders">📄 訂單</a>
+        <a class="nav-item {% if path.startswith(rp ~ '/expenses') %}active{% endif %}" href="{{ rp }}/expenses">💸 支出</a>
+        <a class="nav-item {% if path.startswith(rp ~ '/kpi') %}active{% endif %}"      href="{{ rp }}/kpi">📈 營業額</a>
+        <a class="nav-item {% if path.startswith(rp ~ '/reports') %}active{% endif %}"  href="{{ rp }}/reports">📊 報表</a>
+        <a class="nav-item {% if path.startswith(rp ~ '/ai') %}active{% endif %}"       href="{{ rp }}/ai">🤖 AI 智能助手</a>
+        <a class="nav-item {% if path.startswith(rp ~ '/backup') %}active{% endif %}"   href="{{ rp }}/backup">🧰 備份</a>
       </nav>
+    </aside>
+    {% endif %}
+
+    <main class="main">
+      <section class="content {% if auth_only %}auth-center{% else %}tight{% endif %}">
+        {% block content %}{% endblock %}
+      </section>
+    </main>
+
+    {% if not auth_only %}
+    <div class="corner-actions">
+      {% if user %}
+        <a class="btn pill" href="{{ rp }}/account">帳號設定</a>
+        <a class="btn pill danger" href="{{ rp }}/logout">登出</a>
+      {% else %}
+        <a class="btn pill primary" href="{{ rp }}/login">登入</a>
+      {% endif %}
     </div>
-  </header>
+    {% endif %}
+  </div>
 
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
+  <!-- 根路徑導向（例如 /ui → /ui/orders） -->
+  <script>
+  (function(){
+    const rp = document.body?.dataset?.rootpath || "";
+    const p  = location.pathname.replace(/\/+$/,'');
+    if (rp && p === rp) location.replace(rp + "/orders");
+  })();
+  </script>
 
-  <footer class="al-footer">
-    <div class="container"><small>© AurumLedger</small></div>
-  </footer>
+  <!-- ================== 輕量、不衝突的全站行為 ================== -->
+  <script>
+  (function () {
+    "use strict";
+    const PATH = location.pathname;
+    const $ = (s, r=document)=>r.querySelector(s);
 
-  <script src="{{ url_for('static', path='js/app.js') }}"></script>
-  {% block extra_js %}{% endblock %}
+    /* A) 新增表單：班別記憶 + 著色 */
+    function paintShiftSelect(sel){
+      if (!sel) return;
+      sel.classList.add('shift-select');
+      sel.classList.remove('is-morning','is-night');
+      const v = (sel.value || sel.options?.[sel.selectedIndex]?.text || '').trim();
+      if (/早/.test(v)) sel.classList.add('is-morning'); else if (/晚/.test(v)) sel.classList.add('is-night');
+    }
+    function rememberShift(){
+      const box = document.querySelector('.order-create'); if (!box) return;
+      const sel = box.querySelector('select[name="shift"], .shift-select, [data-role="shift"]'); if (!sel) return;
+      const KEY = 'orders_new_shift';
+      const saved = sessionStorage.getItem(KEY);
+      if (saved){
+        for (const o of sel.options || []) {
+          if (o.value === saved || (o.text||'').includes(saved)) { sel.value = o.value; break; }
+        }
+      }
+      paintShiftSelect(sel);
+      sel.addEventListener('change', ()=>{ paintShiftSelect(sel); sessionStorage.setItem(KEY, sel.value); });
+    }
+
+    /* B) 訂單快速搜尋（清空→回全部；搜尋完自動回焦） */
+    function ordersQuickSearch(){
+      if (!/^{{ rp|replace('/','\/') }}\/orders(\/|$)/.test(PATH)) return;  // 跟 root_path 相容
+      const toolbar = document.querySelector('.toolbar, .search-bar, .filter-bar'); if (!toolbar) return;
+      const q = toolbar.querySelector('input[name="q"]'); if (!q) return;
+
+      let prev = q.value || '';
+      q.addEventListener('input', ()=>{
+        const v = q.value || '';
+        if (prev && !v && location.search) {
+          sessionStorage.setItem('orders_focus_search','1');
+          location.href = '{{ rp }}/orders#search';
+        }
+        prev = v;
+      });
+
+      const form = q.form;
+      if (form){
+        form.addEventListener('submit', ()=>{
+          sessionStorage.setItem('orders_focus_search','1');
+          try{
+            const u = new URL(form.action || location.href, location.origin);
+            form.action = u.pathname + u.search + '#search';
+          }catch{}
+        }, {capture:true});
+      }
+
+      function maybeFocus(){
+        if (sessionStorage.getItem('orders_focus_search')==='1' || location.hash==='#search' || location.search){
+          requestAnimationFrame(()=>{
+            q.focus(); q.select?.(); toolbar.scrollIntoView({block:'start'});
+          });
+          sessionStorage.removeItem('orders_focus_search');
+        }
+      }
+      document.addEventListener('DOMContentLoaded', maybeFocus);
+      window.addEventListener('pageshow', maybeFocus);
+    }
+
+    /* C) KPI/支出 範圍自動送出 */
+    function autoSubmitRangeForm(){
+      const form = document.getElementById('range-form'); if (!form) return;
+      const mode = form.querySelector('#mode') || form.querySelector('select[name="mode"]');
+      const dt   = form.querySelector('#dt')   || form.querySelector('input[name="dt"]');
+      if (mode) mode.addEventListener('change', ()=>form.submit());
+      if (dt)   dt.addEventListener('change', ()=>form.submit());
+    }
+
+    /* D) 新增完回焦單號 */
+    function focusOrderNoAfterCreate(){
+      if (!/^{{ rp|replace('/','\/') }}\/orders(\/|$)/.test(PATH)) return;
+      const input = document.getElementById('order_no_input') || document.querySelector('input[name="order_no"]');
+      if (!input) return;
+      if (location.hash==='#create' || sessionStorage.getItem('orders_focus_orderno')==='1'){
+        requestAnimationFrame(()=>{ input.focus(); input.select?.(); });
+        sessionStorage.removeItem('orders_focus_orderno');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      rememberShift();
+      ordersQuickSearch();
+      autoSubmitRangeForm();
+      focusOrderNoAfterCreate();
+    });
+  })();
+  </script>
+
+  <!-- ================== KPI 金額自動縮放（僅 /kpi 啟用） ================== -->
+  <script>
+  (function(){
+    if (!/^{{ rp|replace('/','\/') }}\/kpi(\/|$)/.test(location.pathname)) return;
+
+    const MIN_PX = 22, STEP = 1, PAD = 6;
+    function fit(el){
+      if (!el) return;
+      const base = parseFloat(getComputedStyle(el).fontSize) || 56;
+      el.style.fontSize = base + 'px';
+      let size = base, guard = 0;
+      const overflows = () => (el.scrollWidth > el.clientWidth - PAD) || (el.scrollHeight > el.clientHeight - PAD);
+      while (overflows() && size > MIN_PX && guard < 120){ size -= STEP; el.style.fontSize = size + 'px'; guard++; }
+    }
+    function fitAll(){ document.querySelectorAll('.kpi-card .kpi-value').forEach(fit); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fitAll, {once:true}); else fitAll();
+    window.addEventListener('resize', fitAll);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAll);
+    const root = document.querySelector('.kpi-wrap') || document.body;
+    new MutationObserver(fitAll).observe(root, {subtree:true, childList:true, characterData:true});
+    setTimeout(fitAll, 200); setTimeout(fitAll, 600);
+  })();
+  </script>
+
+  <!-- 主 JS（跟著 root_path 走） -->
+  <script src="{{ url_for('static', path='/js/app.js') }}?v=dragfix1"></script>
 </body>
 </html>

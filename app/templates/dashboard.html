@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
+{% block page_title %}營業額{% endblock %}
 {% block content %}
 <h2>📈 營業額</h2>
 
 <section class="panel" style="margin-top:10px">
-  <form class="row" method="get" action="/ui/dashboard">
+  <form class="row" method="get" action="/ui">
     <label class="pill">模式</label>
     <select name="mode" onchange="this.form.submit()">
       <option value="day"   {% if mode=='day' %}selected{% endif %}>當日</option>

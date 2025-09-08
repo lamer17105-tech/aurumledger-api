@@ -2,11 +2,14 @@
 {% block title %}營業額{% endblock %}
 {% block content %}
 
-{% set prev_label = '前一天' if mode=='day' else ('前一月' if mode=='month' else '前一年') %}
-{% set today_label = '今日'  if mode=='day' else ('今月'  if mode=='month' else '今年') %}
-{% set next_label = '後一天' if mode=='day' else ('後一月' if mode=='month' else '後一年') %}
+{# 導覽文字 #}
+{% set prev_label  = '前一天' if mode=='day' else ('前一月' if mode=='month' else '前一年') %}
+{% set today_label = '今日'   if mode=='day' else ('今月'   if mode=='month' else '今年') %}
+{% set next_label  = '後一天' if mode=='day' else ('後一月' if mode=='month' else '後一年') %}
+{% set date_label  = '日期'   if mode=='day' else ('月份'   if mode=='month' else '年份') %}
 
-<div class="card toolbar toolbar--range kpi-head">
+<!-- 日期導覽（和 base 的自動提交配對：#range-form, #mode, #dt） -->
+<div class="card toolbar toolbar--range">
   <form id="range-form" method="get" action="/kpi" class="row">
     <label class="label">模式</label>
     <select name="mode" id="mode">
@@ -14,32 +17,47 @@
       <option value="month" {% if mode=='month' %}selected{% endif %}>當月</option>
       <option value="year"  {% if mode=='year' %}selected{% endif %}>當年</option>
     </select>
+
+    <label class="label">{{ date_label }}</label>
     <input type="date" name="dt" id="dt" value="{{ dt }}">
-    <a class="btn pill primary" href="/kpi?mode={{ mode }}&dt={{ nav.prev }}">← {{ prev_label }}</a>
+
+    <a class="btn pill" href="/kpi?mode={{ mode }}&dt={{ nav.prev }}">← {{ prev_label }}</a>
     <a class="btn pill primary" href="/kpi?mode={{ mode }}&dt={{ nav.today }}">{{ today_label }}</a>
-    <a class="btn pill primary" href="/kpi?mode={{ mode }}&dt={{ nav.next }}">{{ next_label }} →</a>
-    <span class="kpi-note">期間：{{ period }}</span>
+    <a class="btn pill" href="/kpi?mode={{ mode }}&dt={{ nav.next }}">{{ next_label }} →</a>
+
+    <span class="muted" style="margin-left:8px">期間：{{ period }}</span>
   </form>
 </div>
 
-<div class="kpi-grid-4">
-  <div class="kpi-mini kpi-early">🧾 早班{{ '當日' if mode=='day' else ('當月' if mode=='month' else '當年') }}</div>
-  <div class="kpi-mini kpi-late">🌙 晚班{{ '當日' if mode=='day' else ('當月' if mode=='month' else '當年') }}</div>
-  <div class="kpi-mini kpi-exp">💳 當日支出</div>
-  <div class="kpi-mini kpi-total">📊 當日總額</div>
+<!-- KPI 卡片 -->
+<section class="kpi-wrap">
+  <article class="kpi-card kpi-morning">
+    <div class="kpi-head">📄 早班</div>
+    <div class="kpi-value">NT${{ k_early|money }}</div>
+  </article>
 
-  <div class="kpi-figure kpi-num-early">NT${{ k_early | money }}</div>
-  <div class="kpi-figure kpi-num-late">NT${{ k_late  | money }}</div>
-  <div class="kpi-figure kpi-num-exp">NT${{ k_exp   | money }}</div>
-  <div class="kpi-figure kpi-num-total">NT${{ k_total | money }}</div>
+  <article class="kpi-card kpi-night">
+    <div class="kpi-head">🌙 晚班</div>
+    <div class="kpi-value">NT${{ k_late|money }}</div>
+  </article>
 
-  <div class="kpi-mini kpi-net">✅ 扣支出後</div>
-  <div class="kpi-figure kpi-num-net">NT${{ k_net | money }}</div>
-</div>
+  <article class="kpi-card kpi-expense">
+    <div class="kpi-head">💳 支出</div>
+    <div class="kpi-value">NT${{ k_exp|money }}</div>
+  </article>
 
-<script>
-  const f=document.getElementById('range-form');
-  document.getElementById('mode').addEventListener('change',()=>f.submit());
-  document.getElementById('dt').addEventListener('change',()=>f.submit());
-</script>
+  <article class="kpi-card kpi-total">
+    <div class="kpi-head">📊 總額</div>
+    <div class="kpi-value">NT${{ k_total|money }}</div>
+  </article>
+
+  <!-- 依你的需求：把「扣支出後」改為「營收」，置中且橫向較寬（樣式在 base 裡已就緒） -->
+  <article class="kpi-card kpi-net">
+    <div class="kpi-head">✅ 營收</div>
+    <div class="kpi-value">
+      <span class="cur">NT$</span><span class="amt">{{ k_net|money }}</span>
+    </div>
+  </article>
+</section>
+
 {% endblock %}
