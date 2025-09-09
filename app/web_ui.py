@@ -1,3 +1,4 @@
+# app/web_ui.py
 from __future__ import annotations
 from pathlib import Path
 from datetime import date, datetime, timedelta
@@ -15,11 +16,9 @@ APP_DIR = Path(__file__).resolve().parent
 DB_PATH = APP_DIR / "aurum.db"
 AUTH_PATH = APP_DIR / "auth.json"
 
-# app/web_ui.py（只改這 3 行）
-import os  # ← 已經有就略過
-app = FastAPI(root_path=os.getenv("ROOT_PATH", ""))  # ← 原本是 app = FastAPI()
+# 保持你的設定（支援 ROOT_PATH、會話）
+app = FastAPI(root_path=os.getenv("ROOT_PATH", ""))
 app.add_middleware(SessionMiddleware, secret_key="CHANGE_ME_32+CHARS")
-
 
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 templates.env.filters["money"] = lambda v: f"{float(v):,.0f}" if v not in (None, "", "None") else "0"
@@ -49,7 +48,7 @@ def _init_db() -> None:
             memo TEXT DEFAULT '',
             ctime TEXT NOT NULL
         )""")
-        # 索引（提升搜尋/篩選/排序穩定度）
+        # 索引
         c.execute("CREATE INDEX IF NOT EXISTS idx_orders_odt_shift_id ON orders(odt, shift, id)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_orders_order_no ON orders(order_no)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_orders_amount   ON orders(amount)")
@@ -149,7 +148,7 @@ def _nav(mode: str, dt: Optional[str]) -> Dict[str,str]:
 # -------------- routes --------------
 @app.get("/")
 def root():
-    return RedirectResponse("/login")
+    return RedirectResponse("/orders")
 
 # ---------- Auth ----------
 @app.get("/login")
@@ -183,7 +182,6 @@ def login_submit(request: Request, username: str = Form(...), password: str = Fo
 
 @app.get("/logout")
 def logout(request: Request):
-    # 登出時保留「記住帳號」cookie 讓登入頁自動帶入
     uname = request.session.get("user","")
     resp = RedirectResponse("/login", status_code=303)
     if uname:
@@ -241,7 +239,7 @@ def orders_page(request: Request, q: Optional[str] = None,
     if from_: where.append("odt>=?"); params.append(from_)
     if to:    where.append("odt<=?"); params.append(to)
     if where: sql += " WHERE " + " AND ".join(where)
-    # 依日期新→舊；同日先早班後晚班；同班別以 id 由小到大（越新的在該班別最下方）
+    # 同日：早班在前、晚班在後；同班別 id 由小到大 → 新增列自然在該班別最尾端
     sql += " ORDER BY odt DESC, CASE WHEN shift='早班' THEN 0 ELSE 1 END, id ASC"
     with _conn() as c:
         rows = [dict(r) for r in c.execute(sql, params)]
@@ -264,8 +262,8 @@ def orders_create(request: Request, odt: str = Form(...), shift: str = Form(...)
         c.execute("INSERT INTO orders (shift,order_no,amount,odt,ctime) VALUES(?,?,?,?,?)",
                   (shift, order_no, amt, odt, datetime.utcnow().isoformat()))
         c.commit()
-    # 與前端統一：回 orders 並帶 #create，前端會自動聚焦「單號」
-    return RedirectResponse("/orders#create", status_code=303)
+    # ★ 關鍵修正：導回「當天」範圍，讓新單顯示在該班別最尾端，並聚焦新增區
+    return RedirectResponse(f"/orders?from_={odt}&to={odt}#create", status_code=303)
 
 @app.post("/orders/update-json")
 async def orders_update_json(request: Request):
@@ -346,7 +344,6 @@ async def expenses_delete(request: Request):
             c.commit()
     return RedirectResponse("/expenses", status_code=303)
 
-# 表內即時更新（分類/金額/日期/備註）
 @app.post("/expenses/update-json")
 async def expenses_update_json(request: Request):
     if _need_login(request):
@@ -385,7 +382,7 @@ def kpi_page(request: Request, mode: str = "day", dt: Optional[str] = None):
         "period": f"{frm} ~ {to}"
     }))
 
-# ---------- Reports（export only, ASCII filename + UTF-8 BOM + CRLF） ----------
+# ---------- Reports（export only, UTF-8 BOM + CRLF） ----------
 def _csv_response(filename_ascii: str, lines: List[str]):
     headers = {
         "Content-Disposition": f"attachment; filename={filename_ascii}; filename*=UTF-8''{quote(filename_ascii)}"
@@ -465,7 +462,7 @@ def ai_analyze(request: Request, q: str = Form(""), mode: str = Form("auto"),
 
     frm, to, tag = period_for(mode, start, end)
 
-    def fetch(sql: str, args=()):
+    def fetch(sql: str, args=()):  # quick helper
         with _conn() as c:
             return [dict(r) for r in c.execute(sql, args)]
 
@@ -526,7 +523,7 @@ def backup_download(request: Request, inc_db: int = 1, inc_auth: int = 1):
         tpl_dir = APP_DIR / "templates"
         for f in sorted(tpl_dir.glob("*.html")):
             z.write(f, arcname=f"templates/{f.name}")
-        # static css
+        # static css（保持你的結構）
         css = APP_DIR / "static" / "css" / "style.css"
         if css.exists(): z.write(css, arcname="static/css/style.css")
         # main app file
@@ -552,15 +549,14 @@ async def backup_restore(request: Request, file: UploadFile = File(...)):
             def _extract_member(name: str, target: Path):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 content = z.read(name)
-                # path safety（限制在 APP_DIR 下）
+                # path safety
                 p = target.resolve()
                 if APP_DIR not in p.parents and p != APP_DIR:
                     raise RuntimeError("非法路徑")
                 with open(p, "wb") as f: f.write(content)
 
             for name in z.namelist():
-                if name.endswith("/"):
-                    continue
+                if name.endswith("/"): continue
                 if name == "web_ui.py":
                     _extract_member(name, APP_DIR / "web_ui.py")
                 elif name.startswith("templates/"):
@@ -572,8 +568,6 @@ async def backup_restore(request: Request, file: UploadFile = File(...)):
                     _extract_member(name, DB_PATH)
                 elif name == "auth.json":
                     _extract_member(name, AUTH_PATH)
-                else:
-                    pass
-        return RedirectResponse("/backup?ok=已還原，請重啟服務使變更生效。", status_code=303)
+            return RedirectResponse("/backup?ok=已還原，請重啟服務使變更生效。", status_code=303)
     except Exception as e:
         return RedirectResponse(f"/backup?err=還原失敗：{quote(str(e))}", status_code=303)

@@ -297,40 +297,6 @@ tr:hover td:not(.shift-morning):not(.shift-night){ background:rgba(0,0,0,.03) !i
 @media (max-width:560px){
   .kpi-wrap{ grid-template-columns:1fr; }
 }
-/* ===== [OVERRIDE] Orders: 班別格固定底色、hover 不反白、勾選格可點整格 ===== */
-
-/* 只讓 hover 影響非班別欄 */
-#orders-table tr:hover td:not(.shift-morning):not(.shift-night){
-  background: rgba(0,0,0,.03) !important;
-}
-
-/* 班別欄固定色（與 JS class 對齊） */
-#orders-body td[data-field="shift"].shift-morning{
-  background: linear-gradient(180deg,#FFF1BF,#FFE08C) !important;
-}
-#orders-body td[data-field="shift"].shift-night{
-  background: linear-gradient(180deg,#E6EAFF,#CCD6FF) !important;
-}
-
-/* 勾選欄位：置中、整格可點（仍保留點 checkbox 本體） */
-#orders-table td:last-child{ text-align:center; cursor:pointer; }
-#orders-table td:last-child input[type="checkbox"]{ pointer-events:auto; }
-
-/* 小正方形 + 紅勾白底（統一唯一版本） */
-input[type="checkbox"]{
-  -webkit-appearance:none; appearance:none;
-  width:14px; height:14px;
-  border:1.8px solid var(--line,#E5D7B2);
-  border-radius:2px; background:#fff;
-  display:inline-grid; place-content:center; vertical-align:middle;
-  box-shadow:none;
-}
-input[type="checkbox"]::after{
-  content:""; width:6px; height:9px; opacity:0;
-  border-right:2px solid #D33; border-bottom:2px solid #D33;
-  transform:rotate(45deg) translate(0,-1px);
-}
-input[type="checkbox"]:checked::after{ opacity:1; }
 /* ===== OVERRIDES (0910) ===== */
 
 /* A) 訂單：班別欄固定色 + hover 不覆蓋 + 勾選格可點整格 */
@@ -437,6 +403,18 @@ input[type="checkbox"]:checked::after{ opacity:1; }
 #expenses-table tr:hover td{   /* 班別欄不受 hover 影響 */
   background: rgba(0,0,0,.03) !important;
 }
+/* KPI：扣支出後卡片做成橫長、再寬一點、字體小一點 */
+.kpi-wrap{ display:grid; grid-template-columns:repeat(4,minmax(220px,1fr)); gap:24px; }
+.kpi-card.kpi-net{
+  grid-column: 1 / -1;           /* 跨整列 */
+  justify-self: center;
+  max-width: 1100px;             /* 左右更寬 */
+}
+.kpi-card.kpi-net .kpi-value{
+  font-size: 48px;               /* 比現在小 */
+  padding: 24px 20px;
+}
+.kpi-card.kpi-net .kpi-value .cur{ font-size:.55em; opacity:.85; } /* NT$ 小一點 */
 /* === KPI：把「營收」（kpi-net）卡片的標題/金額置中 === */
 .kpi-card.kpi-net .kpi-head{
   justify-content: center !important;
@@ -449,30 +427,192 @@ input[type="checkbox"]:checked::after{ opacity:1; }
   justify-content: center !important;
   text-align: center !important;
 }
-/* === KPI 金額：單行顯示，避免換行影響量測 === */
-.kpi-card .kpi-value{
-  white-space: nowrap;
+/* ===== 訂單頁：班別色塊（最小補丁，不覆蓋既有變數與色系） ===== */
+.orders-page td .shift-pill {
+  display: inline-block;
+  min-width: 48px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-align: center;
+  font-weight: 600;
+  line-height: 1.4;
+  border: 1px solid rgba(0,0,0,.06);
 }
-/* KPI 金額單行，不讓內容換行 */
-.kpi-card .kpi-value{ white-space:nowrap; }
-
-/* 營收卡的數字置中（不改卡片尺寸與布局） */
-.kpi-card.kpi-net .kpi-value{ justify-content:center; }
-/* ===== Mobile safe block (不影響桌面) ===== */
-html { -webkit-text-size-adjust: 100%; }            /* iOS 不自動放大字 */
-input, select, textarea { font-size: 16px; }        /* 避免 iOS 聚焦強制放大頁面 */
-
-@media (max-width: 900px){
-  .kpi-wrap{ grid-template-columns: repeat(2, minmax(220px,1fr)); }
-  .kpi-card.kpi-net{ grid-column: 1 / -1; }        /* 營收卡跨一列 */
+.orders-page td .shift-early {
+  background: #F9E7A6;  /* 淡金黃 */
+  color: #5A4300;
 }
-@media (max-width: 560px){
-  .kpi-wrap{ grid-template-columns: 1fr; }
-  .kpi-card .kpi-value{ font-size: 42px; }         /* 極小裝置基準字級（仍會被 autosize 再縮） */
+.orders-page td .shift-late  {
+  background: #DDEBFF;  /* 淡藍 */
+  color: #123A6F;
 }
 
-/* 手機點選「選取」欄位更好點 */
-.cb-cell label.cb-hit{ min-height: 36px; }
+/* 若你的表格需要讓兩個 tbody 之間視覺區隔，可開啟這段（可選） */
+/*
+.orders-page tbody#late-body tr:first-child td {
+  border-top: 2px dashed rgba(0,0,0,.12);
+}
+*/
+/* —— 固定班別顏色，不受編輯/聚焦/反白影響（覆蓋層做底色） —— */
+.orders-page td.col-shift {
+  position: relative;
+  z-index: 0;             /* 建立層疊環境 */
+  background: transparent !important; /* 自身背景透明，交給 ::before 畫色 */
+  background-clip: padding-box;
+}
 
-/* Android 點擊時的水波/高亮不要干擾 */
-* { -webkit-tap-highlight-color: rgba(0,0,0,0); }
+/* 內容疊在覆蓋層之上 */
+.orders-page td.col-shift * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 覆蓋層：把底色畫在 ::before，不會被其他 background 規則覆蓋 */
+.orders-page td.col-shift.shift-early-cell::before,
+.orders-page td.col-shift.shift-late-cell::before {
+  content: "";
+  position: absolute;
+  inset: 0;               /* top/right/bottom/left: 0 */
+  border-radius: inherit;
+  z-index: 0;
+  pointer-events: none;
+}
+.orders-page td.col-shift.shift-early-cell::before { background: #F9E7A6; } /* 早班 */
+.orders-page td.col-shift.shift-late-cell::before  { background: #DDEBFF; } /* 晚班 */
+
+/* 任何狀態都不要把該格改白 */
+.orders-page tr.editing td.col-shift,
+.orders-page tr:focus-within td.col-shift,
+.orders-page td.col-shift:focus,
+.orders-page td.col-shift:focus-within,
+.orders-page tr:hover td.col-shift {
+  background: transparent !important; /* 由 ::before 負責底色 */
+}
+
+/* 格內表單/膠囊維持透明，字色跟著繼承 */
+.orders-page td.col-shift select,
+.orders-page td.col-shift input,
+.orders-page td.col-shift .shift-pill {
+  background: transparent !important;
+  border-color: transparent;
+  color: inherit;
+}
+/* —— 先拔掉我上一版的覆蓋層，避免吃掉格線 —— */
+.orders-page td.col-shift::before { content: none !important; }
+
+/* —— 表格線條恢復可見（保險起見） —— */
+#orders-table { border-collapse: separate; border-spacing: 0; }
+#orders-table th, #orders-table td { border-bottom: 1px solid rgba(0,0,0,.12); }
+#orders-table tr:last-child td { border-bottom-color: rgba(0,0,0,.12); }
+
+/* —— 班別整格著色（不蓋到邊線） —— */
+.orders-page td.col-shift {
+  background: transparent !important;       /* 基底透明，避免跟全站反白打架 */
+  background-clip: padding-box;             /* 只填充到 padding，不覆蓋邊線 */
+}
+
+/* 早班：固定底色 + 深字色（所有狀態都鎖死） */
+.orders-page #orders-table td.col-shift.shift-early-cell,
+.orders-page #orders-table td.col-shift.shift-early-cell:focus,
+.orders-page #orders-table td.col-shift.shift-early-cell:focus-within,
+.orders-page #orders-table tr.editing td.col-shift.shift-early-cell,
+.orders-page #orders-table tr:hover td.col-shift.shift-early-cell {
+  background-color: #F9E7A6 !important;     /* 淡金黃 */
+  color: #5A4300 !important;
+  background-origin: padding-box;
+}
+
+/* 晚班：固定底色 + 深字色（所有狀態都鎖死） */
+.orders-page #orders-table td.col-shift.shift-late-cell,
+.orders-page #orders-table td.col-shift.shift-late-cell:focus,
+.orders-page #orders-table td.col-shift.shift-late-cell:focus-within,
+.orders-page #orders-table tr.editing td.col-shift.shift-late-cell,
+.orders-page #orders-table tr:hover td.col-shift.shift-late-cell {
+  background-color: #DDEBFF !important;     /* 淡藍 */
+  color: #123A6F !important;
+  background-origin: padding-box;
+}
+
+/* 膠囊跟隨字色，避免再覆蓋底色 */
+.orders-page td.col-shift .shift-pill {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: inherit !important;
+  font-weight: 700;
+}
+
+/* —— 編輯時字體會不見：強制輸入元件的文字顏色可見 —— */
+.orders-page td.col-shift input,
+.orders-page td.col-shift select,
+.orders-page td.col-shift textarea {
+  background: transparent !important;
+  border-color: transparent;
+  color: inherit !important;                 /* 跟著上面的深字色 */
+  -webkit-text-fill-color: inherit;          /* 修正某些瀏覽器的填色 */
+  caret-color: currentColor;
+  box-shadow: none !important;               /* 避免內陰影把字吃掉 */
+}
+
+/* 編輯高亮若套在 td.editable，避免蓋色但保留邊線 */
+.orders-page #orders-table td.col-shift.editable,
+.orders-page #orders-table tr.editing td.col-shift {
+  background: transparent !important;        /* 顏色由上面的固定規則提供 */
+}
+
+/* 若全站有 hover 斑馬色，避免作用到班別格 */
+.orders-page #orders-table tr:hover td.col-shift { background: transparent !important; }
+/* 早班：淡金黃漸層 */
+#orders-table td[data-field="shift"].shift-early-cell {
+  color:#5A4300 !important;
+  background: linear-gradient(135deg, #FAF3D1, #F9E7A6) !important;
+}
+
+/* 晚班：淡藍漸層 */
+#orders-table td[data-field="shift"].shift-late-cell {
+  color:#123A6F !important;
+  background: linear-gradient(135deg, #E6F0FF, #DDEBFF) !important;
+}
+
+/* 不要被 focus / hover 蓋掉 */
+#orders-table td[data-field="shift"]:focus,
+#orders-table td[data-field="shift"]:focus-within,
+#orders-table tr.editing td[data-field="shift"],
+#orders-table tr:hover td[data-field="shift"] {
+  background: inherit !important;
+  color: inherit !important;
+}
+/* ===== Orders: 固定班別底色，不受 hover/拖曳/反白影響 ===== */
+#orders-table td[data-field="shift"]{
+  position: relative;
+  background-clip: padding-box;
+  -webkit-user-select: none;
+  user-select: none;                 /* 拖曳時不會選取到文字 */
+}
+
+/* 固定底色（與你現用 class 對齊：shift-morning / shift-night） */
+#orders-table td[data-field="shift"].shift-morning{
+  background: linear-gradient(180deg,#FFF1BF,#FFE08C) !important;
+  color:#5A4300 !important;
+}
+#orders-table td[data-field="shift"].shift-night{
+  background: linear-gradient(180deg,#E6EAFF,#CCD6FF) !important;
+  color:#123A6F !important;
+}
+
+/* 任何狀態都不要覆蓋班別底色（hover / focus / 編輯中） */
+#orders-table tr:hover td[data-field="shift"],
+#orders-table tr:focus-within td[data-field="shift"],
+#orders-table td[data-field="shift"]:hover,
+#orders-table td[data-field="shift"]:focus,
+#orders-table td[data-field="shift"]:focus-within,
+#orders-table tr.editing td[data-field="shift"]{
+  background: inherit !important;
+  color: inherit !important;
+}
+
+/* 反白選取時也不要變色 */
+#orders-table td[data-field="shift"]::selection,
+#orders-table td[data-field="shift"] *::selection{
+  background: transparent !important;
+  color: inherit !important;
+}

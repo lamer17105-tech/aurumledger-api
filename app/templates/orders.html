@@ -68,3 +68,329 @@
 </form>
 
 {% endblock %}
+<!-- ===== 只處理：新增列定位到該班別尾端（不改現有順序與功能）＋ 班別格漸層色 ===== -->
+<script>
+(function () {
+  const table = document.getElementById('orders-table');
+  if (!table) return;
+
+  const $tbody = () => document.getElementById('orders-body');
+  const text = el => (el && el.textContent || '').trim();
+
+  // 讀一列的班別：優先 select，其次儲存格文字；容錯「早/晚」開頭
+  function getShift(tr) {
+    const td = tr.querySelector('td[data-field="shift"]');
+    if (!td) return '';
+    const v = (td.querySelector('select')?.value || text(td)).trim();
+    if (!v) return '';
+    if (v.startsWith('早')) return '早班';
+    if (v.startsWith('晚')) return '晚班';
+    return v;
+  }
+
+  // 找某班別「最後一列」與「第一列」
+  function findLastOf(shift) {
+    const rows = Array.from($tbody().rows);
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (getShift(rows[i]) === shift) return rows[i];
+    }
+    return null;
+  }
+  function findFirstOf(shift) {
+    const rows = Array.from($tbody().rows);
+    for (let i = 0; i < rows.length; i++) {
+      if (getShift(rows[i]) === shift) return rows[i];
+    }
+    return null;
+  }
+
+  // 僅把「指定 tr」移到「指定班別段落的尾端」；不碰其它列
+  function moveToShiftTailStrict(tr, shift) {
+    if (shift === '早班') {
+      const lastEarly = findLastOf('早班');
+      if (lastEarly) {
+        if (tr !== lastEarly && tr !== lastEarly.nextSibling) lastEarly.after(tr);
+        return;
+      }
+      // 沒有任何早班：插到第一個晚班前；若也沒有晚班，就 append
+      const firstLate = findFirstOf('晚班');
+      if (firstLate) $tbody().insertBefore(tr, firstLate);
+      else $tbody().appendChild(tr);
+      return;
+    }
+    if (shift === '晚班') {
+      const lastLate = findLastOf('晚班');
+      if (lastLate) {
+        if (tr !== lastLate && tr !== lastLate.nextSibling) lastLate.after(tr);
+        return;
+      }
+      // 沒有任何晚班：直接 append（維持早班在前、晚班在後的視覺習慣）
+      $tbody().appendChild(tr);
+    }
+  }
+
+  // —— 班別格著色（不影響順序）
+  function paintShiftCell(tr) {
+    const td = tr.querySelector('td[data-field="shift"]');
+    if (!td) return;
+    const s = getShift(tr);
+    td.classList.toggle('xshift-early', s === '早班');
+    td.classList.toggle('xshift-late',  s === '晚班');
+  }
+
+  // 初始只上色；**不**調整任何現有順序
+  Array.from($tbody().rows).forEach(paintShiftCell);
+
+  // 新增列：有時框架先插入 <tr> 再填文字 → 等到拿到班別再定位；只移動新列本身
+  function placeWhenReady(tr) {
+    let tries = 0;
+    const tryPlace = () => {
+      const s = getShift(tr);
+      if (s === '早班' || s === '晚班') {
+        moveToShiftTailStrict(tr, s);
+        paintShiftCell(tr);
+        return true;
+      }
+      return false;
+    };
+    if (tryPlace()) return;
+    const timer = setInterval(() => {
+      tries++;
+      if (tryPlace() || tries >= 20) clearInterval(timer); // 最多 ~1 秒（20*50ms）
+    }, 50);
+  }
+
+  // 監看 tbody：只處理「新增的 tr」，其它不動
+  let bodyObs;
+  function bindTbodyObserver() {
+    const tb = $tbody(); if (!tb) return;
+    if (bodyObs) bodyObs.disconnect();
+    bodyObs = new MutationObserver(muts => {
+      muts.forEach(m => {
+        m.addedNodes.forEach(node => {
+          if (!(node instanceof HTMLElement)) return;
+          if (node.tagName === 'TR') {
+            placeWhenReady(node);
+          } else {
+            node.querySelectorAll && node.querySelectorAll('tr').forEach(placeWhenReady);
+          }
+        });
+      });
+    });
+    bodyObs.observe(tb, { childList: true, subtree: true });
+  }
+  bindTbodyObserver();
+
+  // 若你的框架會「整個替換 tbody」，就重新綁觀察器
+  const tableObs = new MutationObserver(bindTbodyObserver);
+  tableObs.observe(table, { childList: true, subtree: true });
+
+  // 編輯時只「重上色」，**不搬動**（你要求「其他都不要動」）
+  table.addEventListener('change', e => {
+    const td = e.target.closest && e.target.closest('td[data-field="shift"]');
+    if (!td) return;
+    const tr = td.closest('tr'); if (!tr) return;
+    paintShiftCell(tr);
+  });
+})();
+</script>
+
+<style>
+/* —— 保持你原本格線 —— */
+#orders-table { border-collapse: separate; border-spacing: 0; }
+#orders-table th, #orders-table td { border-bottom: 1px solid rgba(0,0,0,.12); }
+
+/* —— 班別格：漸層色，任何狀態都不反白 —— */
+#orders-table td[data-field="shift"]{
+  background: transparent !important;     /* 先把全站反白清掉 */
+  background-clip: padding-box;
+}
+
+/* 早班漸層 */
+#orders-table td[data-field="shift"].xshift-early{
+  color:#5A4300 !important;
+  background: linear-gradient(135deg, #FAF3D1 0%, #F9E7A6 100%) !important;
+}
+/* 晚班漸層 */
+#orders-table td[data-field="shift"].xshift-late{
+  color:#123A6F !important;
+  background: linear-gradient(135deg, #E6F0FF 0%, #DDEBFF 100%) !important;
+}
+
+/* 編輯/聚焦/hover 都維持漸層與字色（不反白） */
+#orders-table td[data-field="shift"]:focus,
+#orders-table td[data-field="shift"]:focus-within,
+#orders-table tr.editing td[data-field="shift"],
+#orders-table tr:hover td[data-field="shift"]{
+  background: inherit !important;
+  color: inherit !important;
+}
+
+/* 編輯時文字可見（避免瀏覽器 text-fill 把字吃掉） */
+#orders-table td[data-field="shift"] input,
+#orders-table td[data-field="shift"] select,
+#orders-table td[data-field="shift"] textarea{
+  background: transparent !important;
+  border-color: transparent;
+  color: inherit !important;
+  -webkit-text-fill-color: inherit;
+  caret-color: currentColor;
+  box-shadow: none !important;
+}
+</style>
+<script>
+(function () {
+  const table = document.getElementById('orders-table');
+  if (!table) return;
+  const $tbody = () => document.getElementById('orders-body');
+  const text = el => (el && el.textContent || '').trim();
+
+  // 讀班別（容錯：select 優先，其次文字；「早/晚」開頭都算）
+  function getShift(tr){
+    const td = tr.querySelector('td[data-field="shift"]');
+    if(!td) return '';
+    const v = (td.querySelector('select')?.value || text(td)).trim();
+    if (!v) return '';
+    if (v.startsWith('早')) return '早班';
+    if (v.startsWith('晚')) return '晚班';
+    return v;
+  }
+
+  // 找某班別的尾端
+  function findLastOf(shift){
+    const rows = Array.from($tbody().rows);
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (getShift(rows[i]) === shift) return rows[i];
+    }
+    return null;
+  }
+
+  // 僅搬動「這一列」到「該班別尾端」
+  function moveToShiftTail(tr, shift){
+    const last = findLastOf(shift);
+    if (last) {
+      if (tr !== last && tr !== last.nextSibling) last.after(tr);
+    } else {
+      // 該班別目前沒列：直接 append（不碰其他列）
+      $tbody().appendChild(tr);
+    }
+  }
+
+  // 班別格上色（漸層）
+  function paintShiftCell(tr){
+    const td = tr.querySelector('td[data-field="shift"]');
+    if(!td) return;
+    const s = getShift(tr);
+    td.classList.toggle('xshift-early', s==='早班');
+    td.classList.toggle('xshift-late',  s==='晚班');
+  }
+
+  // ① 載入時：把「最大 data-id（或 data-idx）」那一列視為『剛新增』只搬它
+  (function placeNewestOnLoad(){
+    const tb = $tbody(); if(!tb) return;
+    const rows = Array.from(tb.rows);
+    if (!rows.length) return;
+
+    // 先都上色（不改順序）
+    rows.forEach(paintShiftCell);
+
+    // 用 data-id 為主，沒有就用 data-idx；取數字最大者
+    function num(v){ const n = +String(v||'').replace(/[^0-9\-\.]/g,''); return isNaN(n)?-Infinity:n; }
+    let newest = null, best = -Infinity;
+
+    rows.forEach(tr=>{
+      const k = Math.max(num(tr.getAttribute('data-id')), num(tr.getAttribute('data-idx')));
+      if (k > best) { best = k; newest = tr; }
+    });
+
+    if (newest) {
+      const s = getShift(newest);
+      if (s === '早班' || s === '晚班') moveToShiftTail(newest, s);
+    }
+  })();
+
+  // ② 動態新增：只搬「新增的那一列」
+  function placeWhenReady(tr){
+    let tries = 0;
+    const tick = () => {
+      const s = getShift(tr);
+      if (s==='早班' || s==='晚班') {
+        moveToShiftTail(tr, s);
+        paintShiftCell(tr);
+        return true;
+      }
+      return false;
+    };
+    if (tick()) return;
+    const t = setInterval(()=>{
+      tries++;
+      if (tick() || tries>=20) clearInterval(t); // 最多約 1s
+    }, 50);
+  }
+
+  let bodyObs;
+  function bindBodyObserver(){
+    const tb = $tbody(); if(!tb) return;
+    if (bodyObs) bodyObs.disconnect();
+    bodyObs = new MutationObserver(muts=>{
+      muts.forEach(m=>{
+        m.addedNodes.forEach(node=>{
+          if(!(node instanceof HTMLElement)) return;
+          if(node.tagName==='TR'){ placeWhenReady(node); }
+          else { node.querySelectorAll && node.querySelectorAll('tr').forEach(placeWhenReady); }
+        });
+      });
+    });
+    bodyObs.observe(tb, { childList:true, subtree:true });
+  }
+
+  // 如果你的框架會替換 tbody，監看 table 以重綁
+  const tableObs = new MutationObserver(bindBodyObserver);
+  tableObs.observe(table, { childList:true, subtree:true });
+  bindBodyObserver();
+
+  // ③ 編輯：只重上色，不搬動
+  table.addEventListener('change', e=>{
+    const td = e.target.closest && e.target.closest('td[data-field="shift"]');
+    if(!td) return;
+    paintShiftCell(td.closest('tr'));
+  });
+})();
+</script>
+
+<style>
+/* 格線保留 */
+#orders-table{ border-collapse: separate; border-spacing: 0; }
+#orders-table th, #orders-table td{ border-bottom:1px solid rgba(0,0,0,.12); }
+
+/* 班別格：漸層色固定，不反白、不吃字 */
+#orders-table td[data-field="shift"]{
+  background: transparent !important;
+  background-clip: padding-box;
+}
+#orders-table td[data-field="shift"].xshift-early{
+  color:#5A4300 !important;
+  background: linear-gradient(135deg, #FAF3D1 0%, #F9E7A6 100%) !important;
+}
+#orders-table td[data-field="shift"].xshift-late{
+  color:#123A6F !important;
+  background: linear-gradient(135deg, #E6F0FF 0%, #DDEBFF 100%) !important;
+}
+#orders-table td[data-field="shift"]:focus,
+#orders-table td[data-field="shift"]:focus-within,
+#orders-table tr.editing td[data-field="shift"],
+#orders-table tr:hover td[data-field="shift"]{
+  background: inherit !important;
+  color: inherit !important;
+}
+#orders-table td[data-field="shift"] input,
+#orders-table td[data-field="shift"] select,
+#orders-table td[data-field="shift"] textarea{
+  background: transparent !important;
+  border-color: transparent;
+  color: inherit !important;
+  -webkit-text-fill-color: inherit;
+  caret-color: currentColor;
+  box-shadow: none !important;
+}
+</style>
